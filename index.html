@@ -1,0 +1,2430 @@
+<!DOCTYPE html>
+<html lang="es"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KETOLance · Panel de seguimiento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&amp;family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<style>
+  :root{
+    --pink:#E0197D;
+    --pink-deep:#B01267;
+    --blue:#1D5FE0;
+    --blue-deep:#123E9E;
+    --ink:#211A2B;
+    --paper:#FBF7F5;
+    --panel:#FFFFFF;
+    --line:#EFE3E9;
+    --muted:#8A7E8C;
+    --green:#1E9E6B;
+    --green-bg:#E4F6EE;
+    --red:#D8385B;
+    --red-bg:#FBE7EC;
+    --amber:#D69A1F;
+    --amber-bg:#FBF2DE;
+    --radius:16px;
+    --shadow: 0 1px 2px rgba(33,26,43,0.04), 0 10px 28px -14px rgba(33,26,43,0.14);
+    --shadow-hover: 0 1px 2px rgba(33,26,43,0.05), 0 16px 34px -14px rgba(33,26,43,0.20);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      radial-gradient(1200px 480px at 8% -10%, rgba(224,25,125,0.08), transparent 60%),
+      radial-gradient(1000px 460px at 96% 0%, rgba(29,95,224,0.08), transparent 55%),
+      var(--paper);
+    color:var(--ink);
+    font-family:'Manrope',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    font-variant-numeric: tabular-nums;
+  }
+  h1,h2,h3{font-family:'Fraunces',Georgia,serif; margin:0;}
+  ::selection{ background: rgba(224,25,125,0.18); }
+  body.public-mode [data-admin-only]{ display:none !important; }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between; gap:24px;
+    padding:20px clamp(16px,3vw,40px);
+    border-bottom:1px solid var(--line);
+    background:rgba(255,255,255,0.7);
+    backdrop-filter:blur(8px);
+    position:sticky; top:0; z-index:40;
+    flex-wrap:wrap;
+  }
+  .topbar::after{
+    content:""; position:absolute; left:0; right:0; bottom:-1px; height:3px;
+    background:linear-gradient(90deg,var(--pink),var(--blue));
+    opacity:.55;
+  }
+  .brand{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  .brand .wordmark{font-family:'Fraunces',serif; font-weight:700; font-size:27px; letter-spacing:-0.01em;}
+  .brand .wordmark span:first-child{color:var(--pink);}
+  .brand .wordmark span:last-child{color:var(--blue);}
+  .brand .tag{color:var(--muted); font-size:13px; padding-left:2px; border-left:1px solid var(--line); margin-left:2px; padding-left:14px;}
+  .mode-chip{
+    font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase;
+    padding:5px 12px; border-radius:999px; background:#F3E9EF; color:var(--pink-deep);
+    border:1px solid #F0D8E5;
+  }
+  body.public-mode .mode-chip{ background:#E7EFFC; color:var(--blue-deep); border-color:#D6E3FA; }
+
+  .meta-right{display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+  .meta-right .updated{font-size:12px; color:var(--muted); text-align:right; line-height:1.35;}
+  .meta-right .updated b{color:var(--ink); font-weight:700;}
+
+  .btn{
+    display:inline-flex; align-items:center; gap:8px;
+    border:none; border-radius:999px;
+    padding:11px 18px; font-weight:700; font-size:13px;
+    cursor:pointer; box-shadow: var(--shadow);
+    transition:transform .15s ease, box-shadow .15s ease;
+    font-family:'Manrope',sans-serif;
+  }
+  .btn:hover{ transform:translateY(-1px); box-shadow:var(--shadow-hover); }
+  .btn-primary{ background:linear-gradient(135deg,var(--pink),var(--pink-deep)); color:#fff; }
+  .btn-primary:hover{ box-shadow:0 14px 30px -12px rgba(224,25,125,0.55); }
+  .btn-secondary{ background:#fff; color:var(--blue-deep); border:1.5px solid #D6E3FA; }
+  .btn-secondary:hover{ box-shadow:0 14px 30px -12px rgba(29,95,224,0.35); }
+  .upload-btn input{ display:none; }
+
+  /* ---------- layout ---------- */
+  .wrap{ max-width:1480px; margin:0 auto; padding:30px clamp(16px,3vw,40px) 64px; }
+
+  .empty-state{
+    margin-top:60px; text-align:center; padding:76px 20px;
+    border:1.5px dashed #E4C9D9; border-radius:22px; background:#fff;
+  }
+  .empty-state .glyph{ font-size:34px; margin-bottom:10px; }
+  .empty-state h2{ font-size:27px; margin-bottom:10px; }
+  .empty-state p{ color:var(--muted); max-width:480px; margin:0 auto 22px; line-height:1.6; font-size:14.5px; }
+
+  #dashboard{ display:none; }
+  #dashboard.visible{ display:block; }
+
+  /* ---------- filters ---------- */
+  .filters{
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    background:var(--panel); border:1px solid var(--line); border-radius:999px;
+    padding:11px 16px; box-shadow:var(--shadow); margin-bottom:24px;
+  }
+  .filters label{ font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); display:block; margin-bottom:2px; font-weight:700;}
+  .filter-item{ display:flex; flex-direction:column; }
+  .filters select{
+    appearance:none; border:1px solid var(--line); background:#FCFAFB;
+    padding:7px 30px 7px 12px; border-radius:999px; font-size:13px; font-weight:700;
+    color:var(--ink); min-width:150px; cursor:pointer;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8'><path d='M1 1l5 5 5-5' stroke='%238A7E8C' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat:no-repeat; background-position:right 12px center;
+  }
+  .filters select:focus{ outline:2px solid rgba(224,25,125,0.35); outline-offset:1px; }
+  .clear-btn{
+    margin-left:auto; border:none; background:var(--ink); color:#fff;
+    padding:9px 18px; border-radius:999px; font-size:12.5px; font-weight:700; cursor:pointer;
+  }
+  .clear-btn:hover{ background:#3a2f47; }
+
+  /* ---------- section eyebrow ---------- */
+  .eyebrow{
+    display:flex; align-items:center; gap:10px; margin:30px 0 12px;
+    font-size:11.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--pink-deep);
+  }
+  .eyebrow::after{ content:""; flex:1; height:1px; background:var(--line); }
+  .grid + .eyebrow, .table-panel + .eyebrow{ margin-top:32px; }
+
+  /* ---------- kpis ---------- */
+  .kpi-row{ display:grid; grid-template-columns:repeat(7,1fr); gap:12px; margin-bottom:8px; }
+  @media(max-width:1200px){ .kpi-row{ grid-template-columns:repeat(4,1fr);} }
+  @media(max-width:680px){ .kpi-row{ grid-template-columns:repeat(2,1fr);} }
+  .kpi{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:16px 16px 15px; box-shadow:var(--shadow); position:relative; overflow:hidden;
+    transition:transform .18s ease, box-shadow .18s ease;
+  }
+  .kpi:hover{ transform:translateY(-2px); box-shadow:var(--shadow-hover); }
+  .kpi::before{
+    content:""; position:absolute; left:0; top:0; bottom:0; width:4px;
+    background:var(--accent,var(--pink));
+  }
+  .kpi .icon{ font-size:15px; opacity:.75; margin-bottom:6px; display:block; }
+  .kpi .label{ font-size:10.5px; letter-spacing:.04em; color:var(--muted); font-weight:800; text-transform:uppercase; }
+  .kpi .value{ font-family:'Fraunces',serif; font-size:29px; font-weight:700; margin-top:5px; line-height:1; }
+
+  /* ---------- panels / charts grid ---------- */
+  .grid{ display:grid; gap:16px; margin-bottom:16px; }
+  .grid.cols-3{ grid-template-columns:1.3fr 1fr 1fr; }
+  .grid.cols-3b{ grid-template-columns:1fr 1fr 1fr; }
+  @media(max-width:1050px){ .grid.cols-3, .grid.cols-3b{ grid-template-columns:1fr; } }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:var(--radius);
+    padding:17px 18px 12px; box-shadow:var(--shadow);
+    transition:box-shadow .18s ease;
+  }
+  .panel:hover{ box-shadow:var(--shadow-hover); }
+  .panel h3{ font-size:13.5px; font-weight:800; letter-spacing:.01em; color:var(--ink); margin-bottom:10px; display:flex; align-items:center; }
+  .panel h3 .accent{ display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--pink); margin-right:8px; flex:none; }
+  .chart-box{ position:relative; height:230px; }
+  .chart-box.tall{ height:280px; }
+
+  /* top IPS mini table */
+  .mini-table{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .mini-table td{ padding:7px 4px; border-bottom:1px solid var(--line); }
+  .mini-table tr:last-child td{ border-bottom:none; }
+  .mini-table td.rank{ color:var(--muted); width:20px; font-weight:700; }
+  .mini-table td.name{ font-weight:700; }
+  .mini-table td.num{ text-align:right; font-weight:800; color:var(--pink-deep); }
+  .bar-mini{ height:5px; border-radius:3px; background:linear-gradient(90deg,var(--blue),var(--pink)); margin-top:4px; }
+
+  /* ---------- data table ---------- */
+  .table-panel{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; }
+  .table-panel .head{ display:flex; align-items:center; justify-content:space-between; padding:17px 18px 12px; gap:12px; flex-wrap:wrap; }
+  .table-panel h3{ font-size:15px; font-family:'Fraunces',serif; font-weight:700;}
+  .search{
+    border:1px solid var(--line); border-radius:999px; padding:8px 14px; font-size:13px; width:250px;
+    background:#FCFAFB;
+  }
+  .search:focus{ outline:2px solid rgba(224,25,125,0.3); }
+  .table-scroll{ overflow:auto; max-height:520px; }
+  table.data{ width:100%; border-collapse:collapse; font-size:12.5px; min-width:1100px; }
+  table.data thead th{
+    position:sticky; top:0; background:#fff; text-align:left; padding:10px 12px;
+    border-bottom:2px solid var(--line); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted);
+    white-space:nowrap; font-weight:800;
+  }
+  table.data tbody td{ padding:9px 12px; border-bottom:1px solid var(--line); white-space:nowrap; }
+  table.data tbody tr:hover{ background:#FCF3F8; }
+  .badge{ display:inline-block; padding:3px 10px; border-radius:999px; font-size:11px; font-weight:800; letter-spacing:.02em; }
+  .badge.VERDE{ background:var(--green-bg); color:var(--green); }
+  .badge.ROJO{ background:var(--red-bg); color:var(--red); }
+  .badge.AMARILLO{ background:var(--amber-bg); color:var(--amber); }
+  .table-foot{ padding:12px 18px; color:var(--muted); font-size:12px; }
+
+  .click-hint{ font-size:10.5px; color:var(--muted); margin:-6px 0 8px; font-style:italic; }
+  .footnote{ margin-top:26px; font-size:11.5px; color:var(--muted); line-height:1.7; max-width:900px; }
+  .footnote b{ color:var(--ink); }
+</style>
+</head>
+<body>
+
+  <script type="application/json" id="embedded-data">[{"estado":"INACTIVO","ciudad":"MEDELLIN","visitador":"Sin dato","eps":"Sura","ips":"HPTU","profesional":"DR.CARREÑO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-04-20T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":null,"aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"DANIEL GIL MARULANDA"},{"estado":"INACTIVO","ciudad":"BARRANQUILLA","visitador":"Sin dato","eps":"Sura","ips":"Sin dato","profesional":"RAFAEL ANTONIO PAZ","tipoMipres":"RENOVACION","fechaIngreso":"2026-02-25T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":null,"aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"HILLARY SARAY VANEGAS"},{"estado":"INACTIVO","ciudad":"CARTAGENA","visitador":"Sin dato","eps":"Mutualser","ips":"Sin dato","profesional":"LAURA GUIO","tipoMipres":"RENOVACION","fechaIngreso":"2026-02-25T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":null,"aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":["2026-07-21T05:00:16.000Z","2026-07-21T05:00:16.000Z"],"nombre":"REGINA REVOLLO GOMEZ"},{"estado":"INACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Salud Total","ips":"FUNDACION CENTRO COLOMBIANO DE EPILEPSIA Y ENFERMEDADES NEUROLOGICAS","profesional":"VANESSA MARIA GOMEZ GULFO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-03-24T05:00:16.000Z","latasTotales":8,"latasMes":8,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"SI","entregas":["2026-05-06T05:00:16.000Z"],"nombre":"EDER BELISARIO SARMIENTO ZUÑIGA"},{"estado":"INACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Salud Total","ips":"NEURODINAMIA S.A","profesional":"JESSICA ISABEL BARRIOS CASTILLO","tipoMipres":"RENOVACION","fechaIngreso":"2026-03-25T05:00:16.000Z","latasTotales":30,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"SI","entregas":["2026-06-05T05:00:16.000Z","2026-07-06T05:00:16.000Z","2026-08-18T05:00:16.000Z"],"nombre":"JOSE DEL CARMEN LARA VERGARA"},{"estado":"INACTIVO","ciudad":"TUNJA","visitador":"Mabel Rodríguez","eps":"Famisanar","ips":"INTERCLINICA AVA S.A.S","profesional":"JUAN PABLO MENDOZA SIERRA","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-03-25T05:00:16.000Z","latasTotales":11,"latasMes":11,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Otro","entregadoOPL":"SI","entregas":["2026-06-24T05:00:16.000Z","2026-07-24T05:00:16.000Z","2026-08-19T05:00:16.000Z"],"nombre":"JUAN DAVID CORDERO RUIZ"},{"estado":"INACTIVO","ciudad":"TUNJA","visitador":"Mabel Rodríguez","eps":"Famisanar","ips":"AVANCEMOS CENTRO DE REHABILITACION S.A.S","profesional":"LUZ YESMITH VALENCIA CERTIGA","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-03-25T05:00:16.000Z","latasTotales":9,"latasMes":9,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Medic Colombia","entregadoOPL":"SI","entregas":["2026-05-28T05:00:16.000Z","2026-06-26T05:00:16.000Z","2026-07-24T05:00:16.000Z"],"nombre":"EVELIN DANIELA CASTRO BAUTISTA"},{"estado":"INACTIVO","ciudad":"CALI","visitador":"Carolina Ardila","eps":"Sanitas","ips":"INSTITUTO NEUROLÓGICO DEL PACIFICO","profesional":"CARLOS ANDRES CLAVIJO PRADO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-03-25T05:00:16.000Z","latasTotales":10,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"SI","entregas":["2026-04-30T05:00:16.000Z"],"nombre":"ALBERHT ALEXANDER YZTURIZ LOPEZ"},{"estado":"INACTIVO","ciudad":"TUNJA","visitador":"Mabel Rodríguez","eps":"Famisanar","ips":"AVANCEMOS CENTRO DE REHABILITACION S.A.S","profesional":"JULIETH CAMILA PERICO TORRES","tipoMipres":"RENOVACION","fechaIngreso":"2026-04-07T05:00:16.000Z","latasTotales":72,"latasMes":24,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Medic Colombia","entregadoOPL":"SI","entregas":["2026-05-21T05:00:16.000Z"],"nombre":"NICOLAS MATHEUS BARRERA RINCON"},{"estado":"INACTIVO","ciudad":"ANTIOQUIA","visitador":"Stefania Restrepo","eps":"Savia salud","ips":"E.S.E HOSPITAL SAN JUAN DE DIOS DEL CARMEN DE VIBORAL","profesional":"DANIELA ANDREA ESTRADA VELEZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-03-24T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":null,"aprobadoEPS":null,"operador":"Medic Colombia","entregadoOPL":"NO","entregas":["2026-07-04T05:00:16.000Z","2026-08-24T05:00:16.000Z"],"nombre":"SOFIA QUINTERO RAMIREZ"},{"estado":"INACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Coosalud","ips":"FUNDACION CENTRO COLOMBIANO DE EPILEPSIA Y ENFERMEDADES NEUROLOGICAS","profesional":"VANESSA MARIA GOMEZ GULFO","tipoMipres":"RENOVACION","fechaIngreso":"2026-03-25T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"SI","aprobadoEPS":null,"operador":"Nal droguerias","entregadoOPL":"NO","entregas":[],"nombre":"WENDIS JUDITH TORREGLOSA GONZALEZ"},{"estado":"INACTIVO","ciudad":"ARJONA","visitador":"Esmeralda Díaz","eps":"Mutualser","ips":"E.S.E HOSPITAL LOCAL ARJONA","profesional":"JESSICA ISABEL BARRIOS CASTILLO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-03-20T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"SI","aprobadoEPS":null,"operador":"Otro","entregadoOPL":"NO","entregas":[],"nombre":"KELIS YOHANA MARRUGO MARRUGO"},{"estado":"INACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Sanitas","ips":"NEUROCESAR SAS","profesional":"RAMON ANTONIO QUINTERO ALMENAREZ","tipoMipres":"RENOVACION","fechaIngreso":"2026-03-26T05:00:16.000Z","latasTotales":45,"latasMes":15,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":["2026-07-15T05:00:16.000Z","2026-08-03T05:00:16.000Z"],"nombre":"KELYS TATIANA ACOSTA MEJIA"},{"estado":"INACTIVO","ciudad":"ANTIOQUIA","visitador":"Isabella Caro","eps":"Sura","ips":"CIS COMFARMA SAN IGNACIO","profesional":"ANDREA MARIN VELEZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-03-26T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"NO","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"BERTHA OLIVA GONZALEZ PAMPLONA"},{"estado":"INACTIVO","ciudad":"TUNJA","visitador":"Mabel Rodríguez","eps":"Proteger","ips":"AVANCEMOS CENTRO DE REHABILITACION S.A.S","profesional":"JULIETH CAMILA PERICO TORRES","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-04-17T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"SI","aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"CAROL YISETH FANDIÑO MORENO"},{"estado":"INACTIVO","ciudad":"CARMEN DE VIBORAL","visitador":"Isabella Caro","eps":"Savia salud","ips":"E.S.E HOSPITAL SAN JUAN DE DIOS DEL CARMEN DE VIBORAL","profesional":"MANUELA OSORIO CARDONA","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-04-27T05:00:16.000Z","latasTotales":36,"latasMes":36,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Medic Colombia","entregadoOPL":"SI","entregas":[],"nombre":"SOFIA QUINTERO RAMIREZ"},{"estado":"INACTIVO","ciudad":"BUCARAMANGA","visitador":"Gloria Ruíz","eps":"Nueva EPS","ips":"HEALTH & LIFE IPS SEDE CABECERA","profesional":"DERLY JAIDY SANCHEZ PEÑA","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-05-27T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"SI","aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"ELVIS JOSE GONZALEZ VELASQUEZ"},{"estado":"INACTIVO","ciudad":"SOLEDAD","visitador":"Esmeralda Díaz","eps":"Mutualser","ips":"NOVASALUD CARIBE IPS S.A","profesional":"JOSE SANTANDER ROSALES MANJARRES","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-04-17T05:00:16.000Z","latasTotales":12,"latasMes":12,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Pharmaser","entregadoOPL":"SI","entregas":["2026-05-28T05:00:16.000Z"],"nombre":"JULIAN FRANCISCO OLAYA STAND"},{"estado":"INACTIVO","ciudad":"TUNJA","visitador":"Mabel Rodríguez","eps":"Sanitas","ips":"EMPRESA SOCIAL DEL ESTADO HOSPITAL UNIVERSITARIO SAN RAFAEL DE TUNJA","profesional":"KELLY JOHANA MELO PORTILLO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-04-17T05:00:16.000Z","latasTotales":7,"latasMes":7,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Colsubsidio","entregadoOPL":"SI","entregas":["2026-08-12T05:00:16.000Z"],"nombre":"MARIA ISABEL BOHORQUEZ VERA"},{"estado":"INACTIVO","ciudad":"BOGOTA","visitador":"Ángela Bohórquez","eps":"Compensar","ips":"INSTITUTO DE ORTOPEDIA INFANTIL ROOSEVELT","profesional":"DANIELA FERNANDA MEJIA PARRA","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-05-06T05:00:16.000Z","latasTotales":3,"latasMes":3,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"MTD","entregadoOPL":"SI","entregas":["2026-06-19T05:00:16.000Z","2026-07-18T05:00:16.000Z"],"nombre":"EMMA ISABELLA GONZALEZ GONZALEZ"},{"estado":"INACTIVO","ciudad":"ARJONA","visitador":"Esmeralda Díaz","eps":"Mutualser","ips":"E.S.E HOSPITAL LOCAL ARJONA","profesional":"JESSICA ISABEL BARRIOS CASTILLO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-05-29T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":null,"aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"KELIS YOHANA MARRUGO MARRUGO"},{"estado":"INACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Salud Total","ips":"NEURODINAMIA S.A","profesional":"JESSICA ISABEL BARRIOS CASTILLO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-04-27T05:00:16.000Z","latasTotales":12,"latasMes":12,"aprobadoIPS":"SI","aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":"SI","entregas":["2026-05-20T05:00:16.000Z"],"nombre":"JOEL IGNACIO PAUTT ACEVEDO"},{"estado":"INACTIVO","ciudad":"BOGOTA","visitador":"Ángela Bohórquez","eps":"Famisanar","ips":"INSTITUTO DE ORTOPEDIA INFANTIL ROOSEVELT","profesional":"SANDRA LILIANA ARDILA SALAZAR","tipoMipres":"RENOVACION","fechaIngreso":"2026-03-25T05:00:16.000Z","latasTotales":18,"latasMes":6,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Medic Colombia","entregadoOPL":"SI","entregas":["2026-07-24T05:00:16.000Z"],"nombre":"JUAN ESTEBAN AGUIRRE JIMENEZ"},{"estado":"INACTIVO","ciudad":"BUCARAMANGA","visitador":"Pablo Silva","eps":"Sanitas","ips":"HEALTH & LIFE IPS SEDE CABECERA","profesional":"DERLY JAIDY SANCHEZ PEÑA","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-07-03T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"SI","aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"DIOSEMEL DIAZ TARAZONA"},{"estado":"INACTIVO","ciudad":"CALI","visitador":"Carolina Ardila","eps":"Asmetsalud","ips":"INSTITUTO NEUROLÓGICO DEL PACIFICO","profesional":"CARLOS ANDRES CLAVIJO PRADO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-04-14T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"NO","aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"PATRICIA PERDOMO PERDOMO"},{"estado":"INACTIVO","ciudad":"BOGOTA","visitador":"Mabel Rodríguez","eps":"Sanitas","ips":"SERVICIOS MEDICOS ESPECIALIZADOS NEUROSALUD S.A.S NEUROSALUD I.S.P. S.A.S","profesional":"JUAN PABLO DURAN AYLLON","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-06-12T05:00:16.000Z","latasTotales":7,"latasMes":7,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"SI","entregas":["2026-07-02T05:00:16.000Z"],"nombre":"LUISA FERNANDA JIMENEZ MONTEALEGRE"},{"estado":"INACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Sanitas","ips":"NEUROCESAR SAS","profesional":"RAMON ANTONIO QUINTERO ALMENAREZ","tipoMipres":"RENOVACION","fechaIngreso":"2026-04-13T05:00:16.000Z","latasTotales":45,"latasMes":15,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":["2026-08-11T05:00:16.000Z"],"nombre":"MIGUEL DE JESUS ACOSTA CARVAL"},{"estado":"INACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Sanitas","ips":"NEUROCESAR SAS","profesional":"RAMON ANTONIO QUINTERO ALMENAREZ","tipoMipres":"RENOVACION","fechaIngreso":"2026-04-13T05:00:16.000Z","latasTotales":42,"latasMes":14,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":["2026-08-11T05:00:16.000Z"],"nombre":"YIMI DANIEL ACOSTA CARVAL"},{"estado":"INACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Proteger","ips":"CLINICA MEDICOS SA","profesional":"VICTOR JULIO GUERRA ARAUJO","tipoMipres":"RENOVACION","fechaIngreso":"2026-03-24T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"ELIM JIREH MERCADO VASQUEZ"},{"estado":"ACTIVO","ciudad":"PAIPA","visitador":"Mabel Rodríguez","eps":"Fomag","ips":"MEDISENS IPS / REGIMEN ESPECIAL/ JERSALUD","profesional":"YASMIN SANCHEZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-03-25T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Otro","entregadoOPL":"NO","entregas":[],"nombre":"DYLAN NICOLAS ALVARADO CORREDOR"},{"estado":"INACTIVO","ciudad":"MONIQUIRA","visitador":"Mabel Rodríguez","eps":"Policia","ips":"Servinsalud IPS SAS /REGIMEN ESPECIAL","profesional":"INGRID TATIANA ALVAREZ R","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-04-13T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"DANIEL SANTIAGO VARGAS"},{"estado":"INACTIVO","ciudad":"BOGOTA","visitador":"Mabel Rodríguez","eps":"Sanitas","ips":"SERVICIOS MEDICOS ESPECIALIZADOS NEUROSALUD S.A.S NEUROSALUD I.S.P. S.A.S","profesional":"JUAN PABLO DURAN AYLLON","tipoMipres":"RENOVACION","fechaIngreso":"2026-07-22T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"NO","aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"LUISA FERNANDA JIMENEZ MONTEALEGRE"},{"estado":"INACTIVO","ciudad":"NEIVA","visitador":"Ángela Bohórquez","eps":"Sanitas","ips":"CLINICA BELO HORIZONTE SAS","profesional":"ANA PAOLA BERRIO ALVAREZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-07-17T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"ELKIN FIERRO PUENTES"},{"estado":"INACTIVO","ciudad":"NEIVA","visitador":"Ángela Bohórquez","eps":"Sanitas","ips":"CLINICA BELO HORIZONTE SAS","profesional":"ANA PAOLA BERRIO ALVAREZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-07-17T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"FABIO NELSON CASTILLO LOSADA"},{"estado":"INACTIVO","ciudad":"BOGOTA","visitador":"Ángela Bohórquez","eps":"Capital salud","ips":"FUNDACION HOSPITAL DE LA MISERICORDIA","profesional":"ANGIE KATHERINE CARDENAS ARIAS","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-05-20T05:00:16.000Z","latasTotales":10,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"SI","entregas":["2026-08-26T05:00:16.000Z"],"nombre":"WAYNER GERARD RIVERA HERNANDEZ"},{"estado":"INACTIVO","ciudad":"SANTANDER","visitador":"Ángela Bohórquez","eps":"Fomag","ips":"CLINICA FOSCAL-SANTA CRUZ DE LA LOMA / SOLSALUD E.P.S. S.A / FOMAG","profesional":"ANA P. BERRIO","tipoMipres":"RENOVACION","fechaIngreso":"2026-04-27T05:00:16.000Z","latasTotales":21,"latasMes":7,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":["2026-05-22T05:00:16.000Z","2026-06-26T05:00:16.000Z","2026-07-27T05:00:16.000Z"],"nombre":"LESLY GINNETH LIZARAZO CALA"},{"estado":"INACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Sanitas","ips":"NEUROCESAR SAS","profesional":"RAMON ANTONIO QUINTERO ALMENAREZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-04-29T05:00:16.000Z","latasTotales":12,"latasMes":12,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":["2026-05-20T05:00:16.000Z"],"nombre":"HECTOR ISMAEL MANJARRES MARTINEZ"},{"estado":"INACTIVO","ciudad":"CALI","visitador":"Carolina Ardila","eps":"Sanitas","ips":"INSTITUTO NEUROLÓGICO DEL PACIFICO","profesional":"CARLOS ANDRES CLAVIJO PRADO","tipoMipres":"RENOVACION","fechaIngreso":"2026-05-07T05:00:16.000Z","latasTotales":30,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"SI","entregas":["2026-05-14T05:00:16.000Z","2026-06-19T05:00:16.000Z","2026-07-31T05:00:16.000Z"],"nombre":"ALBERHT ALEXANDER YZTURIZ LOPEZ"},{"estado":"ACTIVO","ciudad":"TUNJA","visitador":"Mabel Rodríguez","eps":"Famisanar","ips":"AVANCEMOS CENTRO DE REHABILITACION S.A.S","profesional":"LUZ YESMITH VALENCIA CERTIGA","tipoMipres":"RENOVACION","fechaIngreso":"2026-03-25T05:00:16.000Z","latasTotales":27,"latasMes":9,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Medic Colombia","entregadoOPL":"SI","entregas":[],"nombre":"EVELIN DANIELA CASTRO BAUTISTA"},{"estado":"INACTIVO","ciudad":"TUNJA","visitador":"Mabel Rodríguez","eps":"Famisanar","ips":"AVANCEMOS CENTRO DE REHABILITACION S.A.S","profesional":"JULIETH CAMILA PERICO TORRES","tipoMipres":"RENOVACION","fechaIngreso":"2026-04-07T05:00:16.000Z","latasTotales":72,"latasMes":24,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Medic Colombia","entregadoOPL":"SI","entregas":["2026-05-21T05:00:16.000Z","2026-06-11T05:00:16.000Z","2026-07-14T05:00:16.000Z"],"nombre":"NICOLAS MATHEUS BARRERA RINCON"},{"estado":"ACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Salud Total","ips":"NEURODINAMIA S.A","profesional":"JESSICA ISABEL BARRIOS CASTILLO","tipoMipres":"RENOVACION","fechaIngreso":"2026-05-25T05:00:16.000Z","latasTotales":30,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"SI","entregas":[],"nombre":"JOSE DEL CARMEN LARA VERGARA"},{"estado":"ACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Sanitas","ips":"NEUROCESAR SAS","profesional":"RAMON ANTONIO QUINTERO ALMENAREZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-06-10T05:00:16.000Z","latasTotales":12,"latasMes":12,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":["2026-06-19T05:00:16.000Z"],"nombre":"YAJAIRA ESTHER VALERA MIELES"},{"estado":"ACTIVO","ciudad":"BOGOTA","visitador":"Mabel Rodríguez","eps":"Sanitas","ips":"SERVICIOS MEDICOS ESPECIALIZADOS NEUROSALUD S.A.S NEUROSALUD I.S.P. S.A.S","profesional":"MIGUEL ANGEL AYALA CASTILLO","tipoMipres":"RENOVACION","fechaIngreso":"2026-06-12T05:00:16.000Z","latasTotales":21,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"SI","entregas":["2026-07-02T05:00:16.000Z","2026-09-01T05:00:16.000Z"],"nombre":"MARIANA LETICIA CASTRO MERIÑO"},{"estado":"INACTIVO","ciudad":"TUNJA","visitador":"Mabel Rodríguez","eps":"Famisanar","ips":"GRUPO AVA LABZELL LIMITADA","profesional":"LILIANA YOLANDA VEGA HIGUERA","tipoMipres":"RENOVACION","fechaIngreso":"2026-06-19T05:00:16.000Z","latasTotales":33,"latasMes":11,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Medic Colombia","entregadoOPL":"SI","entregas":[],"nombre":"JUAN DAVID CORDERO RUIZ"},{"estado":"ACTIVO","ciudad":"BOGOTA","visitador":"Ángela Bohórquez","eps":"Compensar","ips":"INSTITUTO DE ORTOPEDIA INFANTIL ROOSEVELT","profesional":"DANIELA FERNANDA MEJIA PARRA","tipoMipres":"RENOVACION","fechaIngreso":"2026-05-06T05:00:16.000Z","latasTotales":9,"latasMes":3,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"MTD","entregadoOPL":"SI","entregas":[],"nombre":"EMMA ISABELLA GONZALEZ GONZALEZ"},{"estado":"ACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Sanitas","ips":"NEUROCESAR SAS","profesional":"RAMON ANTONIO QUINTERO ALMENAREZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-06-18T05:00:16.000Z","latasTotales":14,"latasMes":14,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":["2026-07-07T05:00:16.000Z"],"nombre":"EDUARDO JOSE TABORDA OSPINO"},{"estado":"ACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Sanitas","ips":"NEUROCESAR SAS","profesional":"RAMON ANTONIO QUINTERO ALMENAREZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-06-18T05:00:16.000Z","latasTotales":14,"latasMes":14,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":["2026-07-02T05:00:16.000Z"],"nombre":"RONAL TINOCO FLOREZ"},{"estado":"ACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Sanitas","ips":"NEUROCESAR SAS","profesional":"RAMON ANTONIO QUINTERO ALMENAREZ","tipoMipres":"RENOVACION","fechaIngreso":"2026-06-24T05:00:16.000Z","latasTotales":45,"latasMes":15,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":[],"nombre":"KELYS TATIANA ACOSTA MEJIA"},{"estado":"ACTIVO","ciudad":"CARMEN DE VIBORAL","visitador":"Isabella Caro","eps":"Savia salud","ips":"E.S.E HOSPITAL SAN JUAN DE DIOS DEL CARMEN DE VIBORAL","profesional":"MANUELA OSORIO CARDONA","tipoMipres":"RENOVACION","fechaIngreso":"2026-06-24T05:00:16.000Z","latasTotales":108,"latasMes":36,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Otro","entregadoOPL":"SI","entregas":[],"nombre":"SOFIA QUINTERO RAMIREZ"},{"estado":"ACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Salud Total","ips":"NEURODINAMIA S.A","profesional":"VANESSA MARIA GOMEZ GULFO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-07-03T05:00:16.000Z","latasTotales":11,"latasMes":11,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"SI","entregas":["2026-07-24T05:00:16.000Z"],"nombre":"VERENICE ANDREA PEREZ ASENCIO"},{"estado":"ACTIVO","ciudad":"ABREGO","visitador":"Pablo Silva","eps":"Nueva EPS","ips":"IPS ABREGO","profesional":"SIRLEY DAYANA DIAZ ASCANIO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-03-25T05:00:16.000Z","latasTotales":8,"latasMes":8,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"JUAN ANGEL GOMEZ GOMEZ"},{"estado":"ACTIVO","ciudad":"BARRANQUILLA","visitador":"Esmeralda Díaz","eps":"Mutualser","ips":"INSTITUTO COLOMBIANO DE NEUROPEDAGOGÍA LTDA","profesional":"GREGORIO ALFREDO SIERRA DEL VILLAR","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-04-29T05:00:16.000Z","latasTotales":10,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Pharmaser","entregadoOPL":"SI","entregas":["2026-08-01T05:00:16.000Z"],"nombre":"KATHERINE JULIETH RAUSEO GOMEZ"},{"estado":"INACTIVO","ciudad":"HONDA","visitador":"Ángela Bohórquez","eps":"Famisanar","ips":"HOSPITAL SAN JUAN DE DIOS HONDA EMPRESA SOCIAL DEL ESTADO","profesional":"CLARA INES BONILLA BASTIDAS","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-05-06T05:00:16.000Z","latasTotales":8,"latasMes":8,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Medic Colombia","entregadoOPL":"SI","entregas":["2026-06-03T05:00:16.000Z"],"nombre":"JOHAN ALEXANDER RUIZ JORIGUA"},{"estado":"ACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Nueva EPS","ips":"BIENESTAR IPS S.A.S ARSENAL","profesional":"JESSICA ISABEL BARRIOS CASTILLO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-05-21T05:00:16.000Z","latasTotales":10,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Cafam","entregadoOPL":"NO","entregas":[],"nombre":"MARIA DEL SOCORRO NAVARRO ALVAREZ"},{"estado":"ACTIVO","ciudad":"QUIBDO","visitador":"Esmeralda Díaz","eps":"Nueva EPS","ips":"FUNDACIÓN SANTA SOFIA DE ASIS","profesional":"JOSE SANTANDER ROSALES MANJARRES","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-05-25T05:00:16.000Z","latasTotales":9,"latasMes":9,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"YACKSON PALOMEQUE MOSQUERA"},{"estado":"ACTIVO","ciudad":"MANIZALES","visitador":"Ángela Bohórquez","eps":"Nueva EPS","ips":"SEDE HOSPITAL INFANTIL UNIVERSITARIO","profesional":"MILTON DAVID HERRERA RAMIREZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-05-25T05:00:16.000Z","latasTotales":8,"latasMes":8,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"MARIANA SALAZAR DIAZ"},{"estado":"INACTIVO","ciudad":"MEDELLIN","visitador":"Isabella Caro","eps":"Coosalud","ips":"ANGIOSUR S.A.S","profesional":"LAURA NATALIA GIL AGUIRRE","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-06-02T05:00:16.000Z","latasTotales":10,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Otro","entregadoOPL":"NO","entregas":[],"nombre":"SEBASTIAN GOMEZ CANO"},{"estado":"ACTIVO","ciudad":"CARTAGENA","visitador":"Ángela Bohórquez","eps":"Mutualser","ips":"HOSPITAL INFANTIL NAPOLEON FRANCO PAREJA","profesional":"LAURA VICTORIA GUIO MAHECHA","tipoMipres":"RENOVACION","fechaIngreso":"2026-06-02T05:00:16.000Z","latasTotales":60,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Pharmaser","entregadoOPL":"SI","entregas":[],"nombre":"HILLARY SARAY VANEGAS BUSTAMANTE"},{"estado":"ACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Otro","ips":"FIRECOLOMBIA / EPS FERROCARRILES NACIONALES","profesional":"VANESSA MARIA GOMEZ GULFO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-06-10T05:00:16.000Z","latasTotales":11,"latasMes":11,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"NO","entregas":[],"nombre":"RODRIGO CERVANTES CARDENAS"},{"estado":"ACTIVO","ciudad":"ITAGUI","visitador":"Isabella Caro","eps":"Coosalud","ips":"ANGIOSUR S.A.S","profesional":"LAURA NATALIA GIL AGUIRRE","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-06-12T05:00:16.000Z","latasTotales":7,"latasMes":7,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Otro","entregadoOPL":"NO","entregas":[],"nombre":"CARLOS ANDRES PUERTA ZABALA"},{"estado":"ACTIVO","ciudad":"TUNJA","visitador":"Mabel Rodríguez","eps":"Sanitas","ips":"EMPRESA SOCIAL DEL ESTADO HOSPITAL UNIVERSITARIO SAN RAFAEL DE TUNJA","profesional":"ANA ELISA ARGUMEDO VILLADIEGO","tipoMipres":"RENOVACION","fechaIngreso":"2026-06-19T05:00:16.000Z","latasTotales":27,"latasMes":9,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Colsubsidio","entregadoOPL":"SI","entregas":[],"nombre":"MARIA ISABEL BOHORQUEZ VERA"},{"estado":"ACTIVO","ciudad":"YOPAL","visitador":"Mabel Rodríguez","eps":"Nueva EPS","ips":"GYOMEDICAL IPS S.A.S SUC YOPAL","profesional":"CRISTHIAN FABIAN ZORRO PATIÑO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-06-19T05:00:16.000Z","latasTotales":22,"latasMes":22,"aprobadoIPS":"NO","aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"JORGE VALOIS LOPEZ ALARCON"},{"estado":"ACTIVO","ciudad":"BARRANQUILLA","visitador":"Esmeralda Díaz","eps":"Salud Total","ips":"CLINICA MISERICORDIA","profesional":"YESENIA DEL CARMEN PIANETTA (PRESCRIPTOR)/EVA LOPEZ (TRATANTE)","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-06-22T05:00:16.000Z","latasTotales":12,"latasMes":12,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"SI","entregas":["2026-07-30T05:00:16.000Z"],"nombre":"JESUS ANGEL ESCORCIA RODRIGUEZ"},{"estado":"ACTIVO","ciudad":"ARJONA","visitador":"Esmeralda Díaz","eps":"Mutualser","ips":"E.S.E HOSPITAL LOCAL ARJONA","profesional":"JESSICA ISABEL BARRIOS CASTILLO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-06-26T05:00:16.000Z","latasTotales":12,"latasMes":12,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Pharmaser","entregadoOPL":"NO","entregas":[],"nombre":"KELIS YOHANA MARRUGO MARRUGO"},{"estado":"ACTIVO","ciudad":"BUCARAMANGA","visitador":"Pablo Silva","eps":"Nueva EPS","ips":"HEALTH & LIFE IPS SEDE CABECERA","profesional":"DERLY JAIDY SANCHEZ PEÑA","tipoMipres":"RENOVACION","fechaIngreso":"2026-06-26T05:00:16.000Z","latasTotales":87,"latasMes":29,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"ELVIS JOSE GONZALEZ VELASQUEZ"},{"estado":"ACTIVO","ciudad":"SOLEDAD","visitador":"Esmeralda Díaz","eps":"Mutualser","ips":"NOVASALUD CARIBE IPS S.A","profesional":"JOSE SANTANDER ROSALES MANJARRES","tipoMipres":"RENOVACION","fechaIngreso":"2026-07-03T05:00:16.000Z","latasTotales":36,"latasMes":12,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Pharmaser","entregadoOPL":"NO","entregas":[],"nombre":"JULIAN FRANCISCO OLAYA STAND"},{"estado":"ACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Salud Total","ips":"NEURODINAMIA S.A","profesional":"JESSICA ISABEL BARRIOS CASTILLO","tipoMipres":"RENOVACION","fechaIngreso":"2026-07-08T05:00:16.000Z","latasTotales":36,"latasMes":12,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"NO","entregas":["2026-09-04T05:00:16.000Z"],"nombre":"JOEL IGNACIO PAUTT ACEVEDO"},{"estado":"ACTIVO","ciudad":"CUCUTA","visitador":"Ángela Bohórquez","eps":"Coosalud","ips":"CENTRO INTEGRAL DE ATENCION DIAGNOSTICA ESPECIALIZADA","profesional":"LAURA XIMENA FERNANDEZ CRUZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-07-11T05:00:16.000Z","latasTotales":9,"latasMes":9,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Otro","entregadoOPL":"NO","entregas":[],"nombre":"EVELYN TAILETH LOPEZ MANOSALVA"},{"estado":"ACTIVO","ciudad":"BOGOTA","visitador":"Ángela Bohórquez","eps":"Famisanar","ips":"INSTITUTO DE ORTOPEDIA INFANTIL ROOSEVELT","profesional":"SANDRA LILIANA ARDILA SALAZAR","tipoMipres":"RENOVACION","fechaIngreso":"2026-07-06T05:00:16.000Z","latasTotales":18,"latasMes":6,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Medic Colombia","entregadoOPL":"SI","entregas":[],"nombre":"JUAN ESTEBAN AGUIRRE JIMENEZ"},{"estado":"INACTIVO","ciudad":"BUCARAMANGA","visitador":"Pablo Silva","eps":"Sanitas","ips":"HEALTH & LIFE IPS SEDE CABECERA","profesional":"DERLY JAIDY SANCHEZ PEÑA","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-07-15T05:00:16.000Z","latasTotales":8,"latasMes":8,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":["2026-08-24T05:00:16.000Z"],"nombre":"GLADYS ROZO ALVAREZ"},{"estado":"ACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Sanitas","ips":"NEUROCESAR SAS","profesional":"RAMON ANTONIO QUINTERO ALMENAREZ","tipoMipres":"RENOVACION","fechaIngreso":"2026-07-22T05:00:16.000Z","latasTotales":60,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":["2026-07-29T05:00:16.000Z","2026-08-29T05:00:16.000Z"],"nombre":"JOSE JAVIER SALAS ALVARADO"},{"estado":"ACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Sanitas","ips":"NEUROCESAR SAS","profesional":"RAMON ANTONIO QUINTERO ALMENAREZ","tipoMipres":"RENOVACION","fechaIngreso":"2026-07-28T05:00:16.000Z","latasTotales":48,"latasMes":16,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":[],"nombre":"MIGUEL DE JESUS ACOSTA CARVAL"},{"estado":"ACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Sanitas","ips":"NEUROCESAR SAS","profesional":"RAMON ANTONIO QUINTERO ALMENAREZ","tipoMipres":"RENOVACION","fechaIngreso":"2026-07-28T05:00:16.000Z","latasTotales":42,"latasMes":14,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":[],"nombre":"YIMI DANIEL ACOSTA CARVAL"},{"estado":"ACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Sanitas","ips":"NEUROCESAR SAS","profesional":"RAMON ANTONIO QUINTERO ALMENAREZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-07-29T05:00:16.000Z","latasTotales":16,"latasMes":16,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"NO","entregas":[],"nombre":"RODRIGO TOFIÑO RIVERA"},{"estado":"ACTIVO","ciudad":"BOGOTA","visitador":"Ángela Bohórquez","eps":"Sanitas","ips":"CLINICA INFANTIL SANTA MARIA DEL LAGO","profesional":"MANUEL ALEJANDRO LUNA LUNA","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-07-29T05:00:16.000Z","latasTotales":3,"latasMes":3,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"MTD","entregadoOPL":null,"entregas":[],"nombre":"LINA MARIA IBARRA PALACIOS"},{"estado":"ACTIVO","ciudad":"BOGOTA","visitador":"Ángela Bohórquez","eps":"Capital salud","ips":"FUNDACION HOSPITAL DE LA MISERICORDIA","profesional":"ANGIE KATHERINE CARDENAS ARIAS","tipoMipres":"RENOVACION","fechaIngreso":"2026-07-30T05:00:16.000Z","latasTotales":30,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"SI","entregas":[],"nombre":"WAYNER GERARD RIVERA HERNANDEZ"},{"estado":"ACTIVO","ciudad":"VALLEDUPAR","visitador":"Esmeralda Díaz","eps":"Otro","ips":"NEUMOCESAR / EPS DUKASAWI","profesional":"RAFAEL ANTONIO PAZ MACHACON","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-07-30T05:00:16.000Z","latasTotales":12,"latasMes":12,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Otro","entregadoOPL":"NO","entregas":[],"nombre":"DINORIS LEONOR HERRON DAZA"},{"estado":"ACTIVO","ciudad":"QUIBDO","visitador":"Esmeralda Díaz","eps":"Nueva EPS","ips":"FUNDACIÓN SANTA SOFIA DE ASIS","profesional":"JOSE SANTANDER ROSALES MANJARRES","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-08-03T05:00:16.000Z","latasTotales":11,"latasMes":11,"aprobadoIPS":"NO","aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"MARIA DUERLEY BENITEZ PEREA"},{"estado":"ACTIVO","ciudad":"NEIVA","visitador":"Ángela Bohórquez","eps":"Sanitas","ips":"CLINICA BELO HORIZONTE SAS","profesional":"ANA PAOLA BERRIO ALVAREZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-08-03T05:00:16.000Z","latasTotales":11,"latasMes":11,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Discolmets","entregadoOPL":"NO","entregas":["2026-09-08T05:00:16.000Z"],"nombre":"FABIO NELSON CASTILLO LOSADA"},{"estado":"ACTIVO","ciudad":"NEIVA","visitador":"Ángela Bohórquez","eps":"Sanitas","ips":"CLINICA BELO HORIZONTE SAS","profesional":"ANA PAOLA BERRIO ALVAREZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-08-03T05:00:16.000Z","latasTotales":11,"latasMes":11,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Discolmets","entregadoOPL":"NO","entregas":["2026-09-07T05:00:16.000Z"],"nombre":"ELKIN FIERRO PUENTES"},{"estado":"ACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Salud Total","ips":"NEURODINAMIA S.A","profesional":"JESSICA ISABEL BARRIOS CASTILLO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-08-04T05:00:16.000Z","latasTotales":14,"latasMes":14,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Audifarma","entregadoOPL":"NO","entregas":[],"nombre":"MARIANYELLY COROMOTO MEDINA BAEZ"},{"estado":"ACTIVO","ciudad":"PIEDECUESTA","visitador":"Ángela Bohórquez","eps":"Famisanar","ips":"HOSPITAL INTERNACIONAL DE COLOMBIA","profesional":"MILTON DAVID HERRERA RAMIREZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-08-05T05:00:16.000Z","latasTotales":15,"latasMes":15,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Medic Colombia","entregadoOPL":"SI","entregas":["2026-08-14T05:00:16.000Z"],"nombre":"MARIA JOSE MORENO MARMOL"},{"estado":"ACTIVO","ciudad":"BOGOTA","visitador":"Ángela Bohórquez","eps":"Nueva EPS","ips":"FUNDACION HOSPITAL DE LA MISERICORDIA","profesional":"ANGIE CATHERINE CARDENAS ARIAS","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-08-11T05:00:16.000Z","latasTotales":10,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"MIA ANTONELLA ENCISO PIRA"},{"estado":"ACTIVO","ciudad":"BOGOTA","visitador":"Mabel Rodríguez","eps":"Sanitas","ips":"SERVICIOS MEDICOS ESPECIALIZADOS NEUROSALUD S.A.S NEUROSALUD I.S.P. S.A.S","profesional":"JENNYFER VIVIANA MARTINEZ PARDO","tipoMipres":"RENOVACION","fechaIngreso":"2026-08-11T05:00:16.000Z","latasTotales":21,"latasMes":7,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"MTD","entregadoOPL":null,"entregas":[],"nombre":"LUISA FERNANDA JIMENEZ MONTEALEGRE"},{"estado":"ACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Nueva EPS","ips":"BIENESTAR IPS S.A.S ARSENAL","profesional":"JESSICA ISABEL BARRIOS CASTILLO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-08-20T05:00:16.000Z","latasTotales":12,"latasMes":12,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"RAY RONALD GOMEZ RODRIGUEZ"},{"estado":"ACTIVO","ciudad":"BUCARAMANGA","visitador":"Pablo Silva","eps":"Sanitas","ips":"HEALTH & LIFE IPS SEDE CABECERA","profesional":"DERLY JAIDY SANCHEZ PEÑA","tipoMipres":"RENOVACION","fechaIngreso":"2026-08-20T05:00:16.000Z","latasTotales":12,"latasMes":12,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"SI","entregas":[],"nombre":"GLADYS ROZO ALVAREZ"},{"estado":"ACTIVO","ciudad":"PIEDECUESTA","visitador":"Pablo Silva","eps":"Salud mia","ips":"HOSPITAL INTERNACIONAL DE COLOMBIA","profesional":"OSCAR DAVID PEÑUELA VASQUEZ","tipoMipres":"RENOVACION","fechaIngreso":"2026-08-21T05:00:16.000Z","latasTotales":51,"latasMes":17,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Offimedicas","entregadoOPL":"NO","entregas":[],"nombre":"MIGUEL ALEXANDER MARTINEZ BETANCOURT"},{"estado":"ACTIVO","ciudad":"TUNJA","visitador":"Mabel Rodríguez","eps":"Famisanar","ips":"AVANCEMOS CENTRO DE REHABILITACION S.A.S","profesional":"JULIETH CAMILA PERICO TORRES","tipoMipres":"RENOVACION","fechaIngreso":"2026-08-24T05:00:16.000Z","latasTotales":72,"latasMes":24,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Medic Colombia","entregadoOPL":null,"entregas":["2026-09-05T05:00:16.000Z"],"nombre":"NICOLAS MATHEUS BARRERA RINCON"},{"estado":"ACTIVO","ciudad":"MONIQUIRA","visitador":"Mabel Rodríguez","eps":"Policia","ips":"Servinsalud IPS SAS /REGIMEN ESPECIAL","profesional":"YULECI LAVEDE PLAZAS","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-08-26T05:00:16.000Z","latasTotales":0,"latasMes":0,"aprobadoIPS":"NO","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"DANIEL SANTIAGO VARGAS"},{"estado":"ACTIVO","ciudad":"SOLEDAD","visitador":"Esmeralda Díaz","eps":"Mutualser","ips":"NOVASALUD CARIBE IPS S.A","profesional":"GLORIA INES GARCIA MAESTRE","tipoMipres":"RENOVACION","fechaIngreso":"2026-08-26T05:00:16.000Z","latasTotales":36,"latasMes":12,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"CAMILO ANDRES RIVERA POLO"},{"estado":"ACTIVO","ciudad":"SANTANDER","visitador":"Ángela Bohórquez","eps":"Fomag","ips":"CLINICA FOSCAL-SANTA CRUZ DE LA LOMA / SOLSALUD E.P.S. S.A / FOMAG","profesional":"ANA P. BERRIO","tipoMipres":"RENOVACION","fechaIngreso":"2026-08-25T05:00:16.000Z","latasTotales":21,"latasMes":7,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Eticos","entregadoOPL":"NO","entregas":["2026-09-07T05:00:16.000Z"],"nombre":"LESLY GINNETH LIZARAZO CALA"},{"estado":"ACTIVO","ciudad":"CALI","visitador":"Carolina Ardila","eps":"Sanitas","ips":"INSTITUTO NEUROLÓGICO DEL PACIFICO","profesional":"CARLOS ANDRES CLAVIJO PRADO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-08-27T05:00:16.000Z","latasTotales":10,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"SI","operador":"Otro","entregadoOPL":"NO","entregas":[],"nombre":"JESUS OMAR LOPEZ BUESAQUILLO"},{"estado":"ACTIVO","ciudad":"CALI","visitador":"Carolina Ardila","eps":"Sanitas","ips":"INSTITUTO NEUROLÓGICO DEL PACIFICO","profesional":"CARLOS ANDRES CLAVIJO PRADO","tipoMipres":"RENOVACION","fechaIngreso":"2026-08-27T05:00:16.000Z","latasTotales":30,"latasMes":10,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"MAXIMILIANO SERNA"},{"estado":"ACTIVO","ciudad":"TUNJA","visitador":"Mabel Rodríguez","eps":"Nueva EPS","ips":"FAMEDIC IPS TUNJA","profesional":"JULIETH CAMILA PERICO TORRES","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-08-28T05:00:16.000Z","latasTotales":7,"latasMes":7,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"CRISTIAN ANDRES RUIZ AVILA"},{"estado":"ACTIVO","ciudad":"BOGOTA","visitador":"Ángela Bohórquez","eps":"Compensar","ips":"INSTITUTO DE ORTOPEDIA INFANTIL ROOSEVELT","profesional":"DANIELA FERNANDA MEJIA PARRA","tipoMipres":"RENOVACION","fechaIngreso":"2026-09-01T05:00:16.000Z","latasTotales":18,"latasMes":6,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"EMMA ISABELLA GONZALEZ GONZALEZ"},{"estado":"ACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Nueva EPS","ips":"BIENESTAR IPS S.A.S ARSENAL","profesional":"JESSICA ISABEL BARRIOS CASTILLO","tipoMipres":"RENOVACION","fechaIngreso":"2026-08-31T05:00:16.000Z","latasTotales":10,"latasMes":10,"aprobadoIPS":"NO","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"MARIA DEL SOCORRO NAVARRO ALVAREZ"},{"estado":"ACTIVO","ciudad":"QUIBDO","visitador":"Esmeralda Díaz","eps":"Nueva EPS","ips":"FUNDACIÓN SANTA SOFIA DE ASIS","profesional":"JOSE SANTANDER ROSALES MANJARRES","tipoMipres":"RENOVACION","fechaIngreso":"2026-08-31T05:00:16.000Z","latasTotales":27,"latasMes":9,"aprobadoIPS":"NO","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"YACKSON PALOMEQUE MOSQUERA"},{"estado":"ACTIVO","ciudad":"MEDELLIN","visitador":"Isabella Caro","eps":"Savia salud","ips":"CORPORACION HOSPITAL INFANTIL CONCEJO DE MEDELLIN","profesional":"KATERINE CARRASQUILLA FRANCO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-08-31T05:00:16.000Z","latasTotales":8,"latasMes":8,"aprobadoIPS":"NO","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"MAXIMILIANO SERNA MORALES"},{"estado":"ACTIVO","ciudad":"TUNJA","visitador":"Mabel Rodríguez","eps":"Famisanar","ips":"GRUPO AVA LABZELL LIMITADA","profesional":"LILIANA YOLANDA VEGA HIGUERA","tipoMipres":"RENOVACION","fechaIngreso":"2026-09-02T05:00:16.000Z","latasTotales":33,"latasMes":11,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":null,"entregas":[],"nombre":"JUAN DAVID CORDERO RUIZ"},{"estado":"ACTIVO","ciudad":"ABREGO","visitador":"Pablo Silva","eps":"Nueva EPS","ips":"SANAMEDIC SOCIEDAD POR ACCIONES SIMPLIFICADA - S.A.S","profesional":"YANSON ALBERTO MONTAÑO MANJARRES","tipoMipres":"RENOVACION","fechaIngreso":"2026-09-04T05:00:16.000Z","latasTotales":24,"latasMes":8,"aprobadoIPS":"SI","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"JUAN ANGEL GOMEZ GOMEZ"},{"estado":"ACTIVO","ciudad":"CARTAGENA","visitador":"Esmeralda Díaz","eps":"Salud Total","ips":"NEURODINAMIA S.A","profesional":"VANESSA MARIA GOMEZ GULFO","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-09-04T05:00:16.000Z","latasTotales":10,"latasMes":10,"aprobadoIPS":"NO","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"JAYSON LEANDRO ANGULO ORDOÑEZ"},{"estado":"ACTIVO","ciudad":"SOLEDAD","visitador":"Esmeralda Díaz","eps":"Salud Total","ips":"ADOLFO ALVAREZ SAS","profesional":"ADOLFO ENRIQUE ALVAREZ  MONTAÑEZ","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-09-03T05:00:16.000Z","latasTotales":25,"latasMes":25,"aprobadoIPS":"NO","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"MAXIMILIANO JIMENEZ QUINTERO"},{"estado":"ACTIVO","ciudad":"BUCARAMANGA","visitador":"Pablo Silva","eps":"Nueva EPS","ips":"HEALTH & LIFE IPS SEDE CABECERA","profesional":"DERLY JAIDY SANCHEZ PEÑA","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-09-08T05:00:16.000Z","latasTotales":18,"latasMes":18,"aprobadoIPS":"NO","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"SAMUEL DAVID FABRA ANAYA"},{"estado":"ACTIVO","ciudad":"BOGOTA","visitador":"Ángela Bohórquez","eps":"Nueva EPS","ips":"FUNDACION HOSPITAL DE LA MISERICORDIA","profesional":"LAURA VICTORIA GUIO MAHECHA","tipoMipres":"PRIMERA VEZ","fechaIngreso":"2026-09-08T05:00:16.000Z","latasTotales":10,"latasMes":10,"aprobadoIPS":"NO","aprobadoEPS":"NO","operador":"Sin dato","entregadoOPL":"NO","entregas":[],"nombre":"MARIA PAULA ALVIRA SANCHEZ"},{"estado":"","ciudad":"Sin dato","visitador":"Sin dato","eps":"Sin dato","ips":"Sin dato","profesional":"Sin dato","tipoMipres":"","fechaIngreso":null,"latasTotales":0,"latasMes":0,"aprobadoIPS":null,"aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":["2026-08-27T05:00:16.000Z"],"nombre":"ISABEL CRISTINA SUCERQUIA DIAZ"},{"estado":"","ciudad":"Sin dato","visitador":"Sin dato","eps":"Sin dato","ips":"Sin dato","profesional":"Sin dato","tipoMipres":"","fechaIngreso":null,"latasTotales":0,"latasMes":0,"aprobadoIPS":null,"aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":["2026-08-24T05:00:16.000Z"],"nombre":"GABRIELA MAZO ZAFRA"},{"estado":"","ciudad":"Sin dato","visitador":"Sin dato","eps":"Sin dato","ips":"Sin dato","profesional":"Sin dato","tipoMipres":"","fechaIngreso":null,"latasTotales":0,"latasMes":0,"aprobadoIPS":null,"aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":["2026-08-12T05:00:16.000Z"],"nombre":"SARA ISABEL MEJIA ARCILA"},{"estado":"","ciudad":"Sin dato","visitador":"Sin dato","eps":"Sin dato","ips":"Sin dato","profesional":"Sin dato","tipoMipres":"","fechaIngreso":null,"latasTotales":0,"latasMes":0,"aprobadoIPS":null,"aprobadoEPS":null,"operador":"Sin dato","entregadoOPL":null,"entregas":["2026-07-13T05:00:16.000Z"],"nombre":"ALEJANDRO CORREA TRUJILLO"}]</script>
+  <script type="application/json" id="embedded-meta">{"generatedAt":"10/9/2026, 11:39:42 a. m."}</script>
+  <div class="topbar">
+    <div class="brand">
+      <div class="wordmark"><span>KETO</span><span>Lance</span></div>
+      <div class="tag">Panel de seguimiento del programa de pacientes</div>
+      <span class="mode-chip" id="modeChip">Modo administrador</span>
+    </div>
+    <div class="meta-right">
+      <div class="updated" id="updatedText">Archivo: <b>DATA KETOLANCE 2.xlsx</b><br>Cargado 10/9/2026, 11:29:17 a. m.<br>Entregas desde hoja "ENTREGAS"</div>
+      <label class="btn btn-primary upload-btn" data-admin-only="">
+        ⭱ Cargar / actualizar Excel
+        <input type="file" id="fileInput" accept=".xlsx,.xls">
+      </label>
+      <button class="btn btn-secondary" id="exportPublicBtn" data-admin-only="">⭳ Descargar versión pública</button>
+    </div>
+  </div>
+
+  <div class="wrap">
+
+    <div class="empty-state" id="emptyState" style="display: none;">
+      <div class="glyph">📊</div>
+      <h2>Sube el archivo de seguimiento</h2>
+      <p>Carga el Excel de KETOLance (hoja “KETOLance”) con el botón de arriba. El panel se genera automáticamente. Nada queda guardado en el navegador — puedes volver a subir el archivo cuando quieras actualizar los datos, o generar una versión pública de solo lectura para compartir.</p>
+    </div>
+
+    <div id="dashboard" class="visible">
+
+      <!-- filtros -->
+      <div class="filters">
+        <div class="filter-item"><label>EPS</label>
+          <select id="f-eps"><option value="">Todas</option><option value="Asmetsalud">Asmetsalud</option><option value="Capital salud">Capital salud</option><option value="Compensar">Compensar</option><option value="Coosalud">Coosalud</option><option value="Famisanar">Famisanar</option><option value="Fomag">Fomag</option><option value="Mutualser">Mutualser</option><option value="Nueva EPS">Nueva EPS</option><option value="Otro">Otro</option><option value="Policia">Policia</option><option value="Proteger">Proteger</option><option value="Salud mia">Salud mia</option><option value="Salud Total">Salud Total</option><option value="Sanitas">Sanitas</option><option value="Savia salud">Savia salud</option><option value="Sura">Sura</option></select>
+        </div>
+        <div class="filter-item"><label>Ciudad</label>
+          <select id="f-ciudad"><option value="">Todas</option><option value="ABREGO">ABREGO</option><option value="ANTIOQUIA">ANTIOQUIA</option><option value="ARJONA">ARJONA</option><option value="BARRANQUILLA">BARRANQUILLA</option><option value="BOGOTA">BOGOTA</option><option value="BUCARAMANGA">BUCARAMANGA</option><option value="CALI">CALI</option><option value="CARMEN DE VIBORAL">CARMEN DE VIBORAL</option><option value="CARTAGENA">CARTAGENA</option><option value="CUCUTA">CUCUTA</option><option value="HONDA">HONDA</option><option value="ITAGUI">ITAGUI</option><option value="MANIZALES">MANIZALES</option><option value="MEDELLIN">MEDELLIN</option><option value="MONIQUIRA">MONIQUIRA</option><option value="NEIVA">NEIVA</option><option value="PAIPA">PAIPA</option><option value="PIEDECUESTA">PIEDECUESTA</option><option value="QUIBDO">QUIBDO</option><option value="SANTANDER">SANTANDER</option><option value="SOLEDAD">SOLEDAD</option><option value="TUNJA">TUNJA</option><option value="VALLEDUPAR">VALLEDUPAR</option><option value="YOPAL">YOPAL</option></select>
+        </div>
+        <div class="filter-item"><label>Profesional que prescribe</label>
+          <select id="f-profesional"><option value="">Todas</option><option value="ADOLFO ENRIQUE ALVAREZ  MONTAÑEZ">ADOLFO ENRIQUE ALVAREZ  MONTAÑEZ</option><option value="ANA ELISA ARGUMEDO VILLADIEGO">ANA ELISA ARGUMEDO VILLADIEGO</option><option value="ANA P. BERRIO">ANA P. BERRIO</option><option value="ANA PAOLA BERRIO ALVAREZ">ANA PAOLA BERRIO ALVAREZ</option><option value="ANDREA MARIN VELEZ">ANDREA MARIN VELEZ</option><option value="ANGIE CATHERINE CARDENAS ARIAS">ANGIE CATHERINE CARDENAS ARIAS</option><option value="ANGIE KATHERINE CARDENAS ARIAS">ANGIE KATHERINE CARDENAS ARIAS</option><option value="CARLOS ANDRES CLAVIJO PRADO">CARLOS ANDRES CLAVIJO PRADO</option><option value="CLARA INES BONILLA BASTIDAS">CLARA INES BONILLA BASTIDAS</option><option value="CRISTHIAN FABIAN ZORRO PATIÑO">CRISTHIAN FABIAN ZORRO PATIÑO</option><option value="DANIELA ANDREA ESTRADA VELEZ">DANIELA ANDREA ESTRADA VELEZ</option><option value="DANIELA FERNANDA MEJIA PARRA">DANIELA FERNANDA MEJIA PARRA</option><option value="DERLY JAIDY SANCHEZ PEÑA">DERLY JAIDY SANCHEZ PEÑA</option><option value="DR.CARREÑO">DR.CARREÑO</option><option value="GLORIA INES GARCIA MAESTRE">GLORIA INES GARCIA MAESTRE</option><option value="GREGORIO ALFREDO SIERRA DEL VILLAR">GREGORIO ALFREDO SIERRA DEL VILLAR</option><option value="INGRID TATIANA ALVAREZ R">INGRID TATIANA ALVAREZ R</option><option value="JENNYFER VIVIANA MARTINEZ PARDO">JENNYFER VIVIANA MARTINEZ PARDO</option><option value="JESSICA ISABEL BARRIOS CASTILLO">JESSICA ISABEL BARRIOS CASTILLO</option><option value="JOSE SANTANDER ROSALES MANJARRES">JOSE SANTANDER ROSALES MANJARRES</option><option value="JUAN PABLO DURAN AYLLON">JUAN PABLO DURAN AYLLON</option><option value="JUAN PABLO MENDOZA SIERRA">JUAN PABLO MENDOZA SIERRA</option><option value="JULIETH CAMILA PERICO TORRES">JULIETH CAMILA PERICO TORRES</option><option value="KATERINE CARRASQUILLA FRANCO">KATERINE CARRASQUILLA FRANCO</option><option value="KELLY JOHANA MELO PORTILLO">KELLY JOHANA MELO PORTILLO</option><option value="LAURA GUIO">LAURA GUIO</option><option value="LAURA NATALIA GIL AGUIRRE">LAURA NATALIA GIL AGUIRRE</option><option value="LAURA VICTORIA GUIO MAHECHA">LAURA VICTORIA GUIO MAHECHA</option><option value="LAURA XIMENA FERNANDEZ CRUZ">LAURA XIMENA FERNANDEZ CRUZ</option><option value="LILIANA YOLANDA VEGA HIGUERA">LILIANA YOLANDA VEGA HIGUERA</option><option value="LUZ YESMITH VALENCIA CERTIGA">LUZ YESMITH VALENCIA CERTIGA</option><option value="MANUEL ALEJANDRO LUNA LUNA">MANUEL ALEJANDRO LUNA LUNA</option><option value="MANUELA OSORIO CARDONA">MANUELA OSORIO CARDONA</option><option value="MIGUEL ANGEL AYALA CASTILLO">MIGUEL ANGEL AYALA CASTILLO</option><option value="MILTON DAVID HERRERA RAMIREZ">MILTON DAVID HERRERA RAMIREZ</option><option value="OSCAR DAVID PEÑUELA VASQUEZ">OSCAR DAVID PEÑUELA VASQUEZ</option><option value="RAFAEL ANTONIO PAZ">RAFAEL ANTONIO PAZ</option><option value="RAFAEL ANTONIO PAZ MACHACON">RAFAEL ANTONIO PAZ MACHACON</option><option value="RAMON ANTONIO QUINTERO ALMENAREZ">RAMON ANTONIO QUINTERO ALMENAREZ</option><option value="SANDRA LILIANA ARDILA SALAZAR">SANDRA LILIANA ARDILA SALAZAR</option><option value="SIRLEY DAYANA DIAZ ASCANIO">SIRLEY DAYANA DIAZ ASCANIO</option><option value="VANESSA MARIA GOMEZ GULFO">VANESSA MARIA GOMEZ GULFO</option><option value="VICTOR JULIO GUERRA ARAUJO">VICTOR JULIO GUERRA ARAUJO</option><option value="YANSON ALBERTO MONTAÑO MANJARRES">YANSON ALBERTO MONTAÑO MANJARRES</option><option value="YASMIN SANCHEZ">YASMIN SANCHEZ</option><option value="YESENIA DEL CARMEN PIANETTA (PRESCRIPTOR)/EVA LOPEZ (TRATANTE)">YESENIA DEL CARMEN PIANETTA (PRESCRIPTOR)/EVA LOPEZ (TRATANTE)</option><option value="YULECI LAVEDE PLAZAS">YULECI LAVEDE PLAZAS</option></select>
+        </div>
+        <div class="filter-item"><label>Visitador médico</label>
+          <select id="f-visitador"><option value="">Todas</option><option value="Ángela Bohórquez">Ángela Bohórquez</option><option value="Carolina Ardila">Carolina Ardila</option><option value="Esmeralda Díaz">Esmeralda Díaz</option><option value="Gloria Ruíz">Gloria Ruíz</option><option value="Isabella Caro">Isabella Caro</option><option value="Mabel Rodríguez">Mabel Rodríguez</option><option value="Pablo Silva">Pablo Silva</option><option value="Stefania Restrepo">Stefania Restrepo</option></select>
+        </div>
+        <div class="filter-item"><label>Mes de entrega</label>
+          <select id="f-mes"><option value="">Todos</option><option value="2026-04">Abr 2026</option><option value="2026-05">May 2026</option><option value="2026-06">Jun 2026</option><option value="2026-07">Jul 2026</option><option value="2026-08">Ago 2026</option><option value="2026-09">Sep 2026</option></select>
+        </div>
+        <button class="clear-btn" id="clearFilters">Borrar filtros</button>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpi-row" id="kpiRow">
+    <div class="kpi" style="--accent:var(--pink)">
+      <span class="icon">🧑‍⚕️</span>
+      <div class="label">Pacientes activos 2026</div>
+      <div class="value">62</div>
+    </div>
+    <div class="kpi" style="--accent:var(--blue)">
+      <span class="icon">🆕</span>
+      <div class="label">MIPRES primera vez 2026</div>
+      <div class="value">61</div>
+    </div>
+    <div class="kpi" style="--accent:var(--blue)">
+      <span class="icon">🔁</span>
+      <div class="label">MIPRES en renovación 2026</div>
+      <div class="value">43</div>
+    </div>
+    <div class="kpi" style="--accent:var(--pink)">
+      <span class="icon">📦</span>
+      <div class="label">Entregas registradas 2026</div>
+      <div class="value">60</div>
+    </div>
+    <div class="kpi" style="--accent:var(--amber)">
+      <span class="icon">🥫</span>
+      <div class="label">Latas formuladas / mes 2026</div>
+      <div class="value">1.015</div>
+    </div>
+    <div class="kpi" style="--accent:var(--green)">
+      <span class="icon">🚚</span>
+      <div class="label">Latas entregadas 2026</div>
+      <div class="value">595</div>
+    </div>
+    <div class="kpi" style="--accent:var(--pink-deep)">
+      <span class="icon">📥</span>
+      <div class="label">Latas ingresadas 2026</div>
+      <div class="value">1.982</div>
+    </div></div>
+
+      <div class="eyebrow">Entregas y logística</div>
+      <div class="grid cols-3">
+        <div class="panel">
+          <h3><span class="accent"></span>Pacientes, entregas y latas por mes</h3>
+          <div class="click-hint">Haz clic en una barra de mes para filtrar todo el panel</div>
+          <div class="chart-box tall"><canvas id="chartMeses" style="box-sizing: border-box; cursor: pointer; display: block; height: 280px; width: 501px;" width="626" height="350"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3><span class="accent"></span>Entregas por operador logístico</h3>
+          <div class="chart-box tall"><canvas id="chartOperador" style="box-sizing: border-box; display: block; height: 280px; width: 377px;" width="471" height="350"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3><span class="accent"></span>Top IPS por MIPRES</h3>
+          <table class="mini-table" id="topIpsTable">
+    <tbody><tr>
+      <td class="rank">1.</td>
+      <td class="name">NEUROCESAR SAS<div class="bar-mini" style="width:100%"></div></td>
+      <td class="num">12</td>
+    </tr>
+    <tr>
+      <td class="rank">2.</td>
+      <td class="name">NEURODINAMIA S.A<div class="bar-mini" style="width:58%"></div></td>
+      <td class="num">7</td>
+    </tr>
+    <tr>
+      <td class="rank">3.</td>
+      <td class="name">AVANCEMOS CENTRO DE REHABILITACION S.A.S<div class="bar-mini" style="width:50%"></div></td>
+      <td class="num">6</td>
+    </tr>
+    <tr>
+      <td class="rank">4.</td>
+      <td class="name">HEALTH &amp; LIFE IPS SEDE CABECERA<div class="bar-mini" style="width:50%"></div></td>
+      <td class="num">6</td>
+    </tr>
+    <tr>
+      <td class="rank">5.</td>
+      <td class="name">INSTITUTO NEUROLÓGICO DEL PACIFICO<div class="bar-mini" style="width:42%"></div></td>
+      <td class="num">5</td>
+    </tr>
+    <tr>
+      <td class="rank">6.</td>
+      <td class="name">INSTITUTO DE ORTOPEDIA INFANTIL ROOSEVELT<div class="bar-mini" style="width:42%"></div></td>
+      <td class="num">5</td>
+    </tr>
+    <tr>
+      <td class="rank">7.</td>
+      <td class="name">SERVICIOS MEDICOS ESPECIALIZADOS NEUROSALUD S.A.S NEUROSALUD I.S.P. S.A.S<div class="bar-mini" style="width:33%"></div></td>
+      <td class="num">4</td>
+    </tr>
+    <tr>
+      <td class="rank">8.</td>
+      <td class="name">CLINICA BELO HORIZONTE SAS<div class="bar-mini" style="width:33%"></div></td>
+      <td class="num">4</td>
+    </tr>
+    <tr>
+      <td class="rank">9.</td>
+      <td class="name">FUNDACION HOSPITAL DE LA MISERICORDIA<div class="bar-mini" style="width:33%"></div></td>
+      <td class="num">4</td>
+    </tr></tbody></table>
+        </div>
+      </div>
+
+      <div class="eyebrow">Cumplimiento y estados</div>
+      <div class="grid cols-3b">
+        <div class="panel">
+          <h3><span class="accent"></span>Estado aprobación IPS</h3>
+          <div class="chart-box"><canvas id="chartEstadoIPS" style="box-sizing: border-box; display: block; height: 230px; width: 418px;" width="523" height="287"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3><span class="accent"></span>Estado aprobación EPS</h3>
+          <div class="chart-box"><canvas id="chartEstadoEPS" style="box-sizing: border-box; display: block; height: 230px; width: 418px;" width="523" height="287"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3><span class="accent"></span>Estado de entregas</h3>
+          <div class="chart-box"><canvas id="chartEstadoEntrega" style="box-sizing: border-box; display: block; height: 230px; width: 418px;" width="523" height="287"></canvas></div>
+        </div>
+      </div>
+
+      <div class="eyebrow">Distribución geográfica y profesional</div>
+      <div class="grid cols-3b">
+        <div class="panel">
+          <h3><span class="accent"></span>Pacientes por ciudad</h3>
+          <div class="click-hint">Haz clic en una barra para filtrar todo el panel</div>
+          <div class="chart-box"><canvas id="chartCiudad" style="box-sizing: border-box; display: block; height: 230px; width: 418px;" width="523" height="287"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3><span class="accent"></span>Pacientes por EPS</h3>
+          <div class="click-hint">Haz clic en una barra para filtrar todo el panel</div>
+          <div class="chart-box"><canvas id="chartEPS" style="box-sizing: border-box; cursor: default; display: block; height: 230px; width: 418px;" width="523" height="287"></canvas></div>
+        </div>
+        <div class="panel">
+          <h3><span class="accent"></span>Ranking profesionales</h3>
+          <div class="click-hint">Haz clic en un segmento para filtrar todo el panel</div>
+          <div class="chart-box"><canvas id="chartProfesionales" style="box-sizing: border-box; cursor: pointer; display: block; height: 230px; width: 418px;" width="523" height="287"></canvas></div>
+        </div>
+      </div>
+
+      <div class="grid" style="grid-template-columns:1fr;">
+        <div class="panel">
+          <h3><span class="accent"></span>MIPRES por visitador médico</h3>
+          <div class="click-hint">Haz clic en una barra para filtrar todo el panel</div>
+          <div class="chart-box"><canvas id="chartVisitador" style="box-sizing: border-box; cursor: default; display: block; height: 230px; width: 1362px;" width="1703" height="287"></canvas></div>
+        </div>
+      </div>
+
+      <div class="eyebrow">Detalle</div>
+      <div class="table-panel">
+        <div class="head">
+          <h3>Detalle de pacientes</h3>
+          <input class="search" id="tableSearch" placeholder="Buscar paciente, ciudad, médico…">
+        </div>
+        <div class="table-scroll">
+          <table class="data">
+            <thead>
+              <tr>
+                <th>Paciente</th><th>Ciudad</th><th>Visitador médico</th><th>Tipo MIPRES</th>
+                <th>Médico</th><th>Latas mes</th><th>Latas totales</th>
+                <th>Aprob. IPS</th><th>Aprob. EPS</th><th>Entrega 1</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody">
+    <tr>
+      <td>DANIEL GIL MARULANDA</td>
+      <td>MEDELLIN</td>
+      <td>Sin dato</td>
+      <td>Primera vez</td>
+      <td>DR.CARREÑO</td>
+      <td>0</td>
+      <td>0</td>
+      <td></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>HILLARY SARAY VANEGAS</td>
+      <td>BARRANQUILLA</td>
+      <td>Sin dato</td>
+      <td>Renovacion</td>
+      <td>RAFAEL ANTONIO PAZ</td>
+      <td>0</td>
+      <td>0</td>
+      <td></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>REGINA REVOLLO GOMEZ</td>
+      <td>CARTAGENA</td>
+      <td>Sin dato</td>
+      <td>Renovacion</td>
+      <td>LAURA GUIO</td>
+      <td>0</td>
+      <td>0</td>
+      <td></td>
+      <td></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>EDER BELISARIO SARMIENTO ZUÑIGA</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>VANESSA MARIA GOMEZ GULFO</td>
+      <td>8</td>
+      <td>8</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>JOSE DEL CARMEN LARA VERGARA</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>JESSICA ISABEL BARRIOS CASTILLO</td>
+      <td>10</td>
+      <td>30</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>JUAN DAVID CORDERO RUIZ</td>
+      <td>TUNJA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Primera vez</td>
+      <td>JUAN PABLO MENDOZA SIERRA</td>
+      <td>11</td>
+      <td>11</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>EVELIN DANIELA CASTRO BAUTISTA</td>
+      <td>TUNJA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Primera vez</td>
+      <td>LUZ YESMITH VALENCIA CERTIGA</td>
+      <td>9</td>
+      <td>9</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>ALBERHT ALEXANDER YZTURIZ LOPEZ</td>
+      <td>CALI</td>
+      <td>Carolina Ardila</td>
+      <td>Primera vez</td>
+      <td>CARLOS ANDRES CLAVIJO PRADO</td>
+      <td>10</td>
+      <td>10</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>NICOLAS MATHEUS BARRERA RINCON</td>
+      <td>TUNJA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Renovacion</td>
+      <td>JULIETH CAMILA PERICO TORRES</td>
+      <td>24</td>
+      <td>72</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>SOFIA QUINTERO RAMIREZ</td>
+      <td>ANTIOQUIA</td>
+      <td>Stefania Restrepo</td>
+      <td>Primera vez</td>
+      <td>DANIELA ANDREA ESTRADA VELEZ</td>
+      <td>0</td>
+      <td>0</td>
+      <td></td>
+      <td></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>WENDIS JUDITH TORREGLOSA GONZALEZ</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>VANESSA MARIA GOMEZ GULFO</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>KELIS YOHANA MARRUGO MARRUGO</td>
+      <td>ARJONA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>JESSICA ISABEL BARRIOS CASTILLO</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>KELYS TATIANA ACOSTA MEJIA</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>RAMON ANTONIO QUINTERO ALMENAREZ</td>
+      <td>15</td>
+      <td>45</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>BERTHA OLIVA GONZALEZ PAMPLONA</td>
+      <td>ANTIOQUIA</td>
+      <td>Isabella Caro</td>
+      <td>Primera vez</td>
+      <td>ANDREA MARIN VELEZ</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>CAROL YISETH FANDIÑO MORENO</td>
+      <td>TUNJA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Primera vez</td>
+      <td>JULIETH CAMILA PERICO TORRES</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>SOFIA QUINTERO RAMIREZ</td>
+      <td>CARMEN DE VIBORAL</td>
+      <td>Isabella Caro</td>
+      <td>Primera vez</td>
+      <td>MANUELA OSORIO CARDONA</td>
+      <td>36</td>
+      <td>36</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>ELVIS JOSE GONZALEZ VELASQUEZ</td>
+      <td>BUCARAMANGA</td>
+      <td>Gloria Ruíz</td>
+      <td>Primera vez</td>
+      <td>DERLY JAIDY SANCHEZ PEÑA</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>JULIAN FRANCISCO OLAYA STAND</td>
+      <td>SOLEDAD</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>JOSE SANTANDER ROSALES MANJARRES</td>
+      <td>12</td>
+      <td>12</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>MARIA ISABEL BOHORQUEZ VERA</td>
+      <td>TUNJA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Primera vez</td>
+      <td>KELLY JOHANA MELO PORTILLO</td>
+      <td>7</td>
+      <td>7</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>EMMA ISABELLA GONZALEZ GONZALEZ</td>
+      <td>BOGOTA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>DANIELA FERNANDA MEJIA PARRA</td>
+      <td>3</td>
+      <td>3</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>KELIS YOHANA MARRUGO MARRUGO</td>
+      <td>ARJONA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>JESSICA ISABEL BARRIOS CASTILLO</td>
+      <td>0</td>
+      <td>0</td>
+      <td></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>JOEL IGNACIO PAUTT ACEVEDO</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>JESSICA ISABEL BARRIOS CASTILLO</td>
+      <td>12</td>
+      <td>12</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>JUAN ESTEBAN AGUIRRE JIMENEZ</td>
+      <td>BOGOTA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Renovacion</td>
+      <td>SANDRA LILIANA ARDILA SALAZAR</td>
+      <td>6</td>
+      <td>18</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>DIOSEMEL DIAZ TARAZONA</td>
+      <td>BUCARAMANGA</td>
+      <td>Pablo Silva</td>
+      <td>Primera vez</td>
+      <td>DERLY JAIDY SANCHEZ PEÑA</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>PATRICIA PERDOMO PERDOMO</td>
+      <td>CALI</td>
+      <td>Carolina Ardila</td>
+      <td>Primera vez</td>
+      <td>CARLOS ANDRES CLAVIJO PRADO</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>LUISA FERNANDA JIMENEZ MONTEALEGRE</td>
+      <td>BOGOTA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Primera vez</td>
+      <td>JUAN PABLO DURAN AYLLON</td>
+      <td>7</td>
+      <td>7</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>MIGUEL DE JESUS ACOSTA CARVAL</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>RAMON ANTONIO QUINTERO ALMENAREZ</td>
+      <td>15</td>
+      <td>45</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>YIMI DANIEL ACOSTA CARVAL</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>RAMON ANTONIO QUINTERO ALMENAREZ</td>
+      <td>14</td>
+      <td>42</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>ELIM JIREH MERCADO VASQUEZ</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>VICTOR JULIO GUERRA ARAUJO</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>DYLAN NICOLAS ALVARADO CORREDOR</td>
+      <td>PAIPA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Primera vez</td>
+      <td>YASMIN SANCHEZ</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>DANIEL SANTIAGO VARGAS</td>
+      <td>MONIQUIRA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Primera vez</td>
+      <td>INGRID TATIANA ALVAREZ R</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>LUISA FERNANDA JIMENEZ MONTEALEGRE</td>
+      <td>BOGOTA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Renovacion</td>
+      <td>JUAN PABLO DURAN AYLLON</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>ELKIN FIERRO PUENTES</td>
+      <td>NEIVA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>ANA PAOLA BERRIO ALVAREZ</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>FABIO NELSON CASTILLO LOSADA</td>
+      <td>NEIVA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>ANA PAOLA BERRIO ALVAREZ</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>WAYNER GERARD RIVERA HERNANDEZ</td>
+      <td>BOGOTA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>ANGIE KATHERINE CARDENAS ARIAS</td>
+      <td>10</td>
+      <td>10</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>LESLY GINNETH LIZARAZO CALA</td>
+      <td>SANTANDER</td>
+      <td>Ángela Bohórquez</td>
+      <td>Renovacion</td>
+      <td>ANA P. BERRIO</td>
+      <td>7</td>
+      <td>21</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>HECTOR ISMAEL MANJARRES MARTINEZ</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>RAMON ANTONIO QUINTERO ALMENAREZ</td>
+      <td>12</td>
+      <td>12</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>ALBERHT ALEXANDER YZTURIZ LOPEZ</td>
+      <td>CALI</td>
+      <td>Carolina Ardila</td>
+      <td>Renovacion</td>
+      <td>CARLOS ANDRES CLAVIJO PRADO</td>
+      <td>10</td>
+      <td>30</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>EVELIN DANIELA CASTRO BAUTISTA</td>
+      <td>TUNJA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Renovacion</td>
+      <td>LUZ YESMITH VALENCIA CERTIGA</td>
+      <td>9</td>
+      <td>27</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>NICOLAS MATHEUS BARRERA RINCON</td>
+      <td>TUNJA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Renovacion</td>
+      <td>JULIETH CAMILA PERICO TORRES</td>
+      <td>24</td>
+      <td>72</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>JOSE DEL CARMEN LARA VERGARA</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>JESSICA ISABEL BARRIOS CASTILLO</td>
+      <td>10</td>
+      <td>30</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>YAJAIRA ESTHER VALERA MIELES</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>RAMON ANTONIO QUINTERO ALMENAREZ</td>
+      <td>12</td>
+      <td>12</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>MARIANA LETICIA CASTRO MERIÑO</td>
+      <td>BOGOTA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Renovacion</td>
+      <td>MIGUEL ANGEL AYALA CASTILLO</td>
+      <td>10</td>
+      <td>21</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>JUAN DAVID CORDERO RUIZ</td>
+      <td>TUNJA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Renovacion</td>
+      <td>LILIANA YOLANDA VEGA HIGUERA</td>
+      <td>11</td>
+      <td>33</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>EMMA ISABELLA GONZALEZ GONZALEZ</td>
+      <td>BOGOTA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Renovacion</td>
+      <td>DANIELA FERNANDA MEJIA PARRA</td>
+      <td>3</td>
+      <td>9</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>EDUARDO JOSE TABORDA OSPINO</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>RAMON ANTONIO QUINTERO ALMENAREZ</td>
+      <td>14</td>
+      <td>14</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>RONAL TINOCO FLOREZ</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>RAMON ANTONIO QUINTERO ALMENAREZ</td>
+      <td>14</td>
+      <td>14</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>KELYS TATIANA ACOSTA MEJIA</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>RAMON ANTONIO QUINTERO ALMENAREZ</td>
+      <td>15</td>
+      <td>45</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>SOFIA QUINTERO RAMIREZ</td>
+      <td>CARMEN DE VIBORAL</td>
+      <td>Isabella Caro</td>
+      <td>Renovacion</td>
+      <td>MANUELA OSORIO CARDONA</td>
+      <td>36</td>
+      <td>108</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>VERENICE ANDREA PEREZ ASENCIO</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>VANESSA MARIA GOMEZ GULFO</td>
+      <td>11</td>
+      <td>11</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>JUAN ANGEL GOMEZ GOMEZ</td>
+      <td>ABREGO</td>
+      <td>Pablo Silva</td>
+      <td>Primera vez</td>
+      <td>SIRLEY DAYANA DIAZ ASCANIO</td>
+      <td>8</td>
+      <td>8</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>KATHERINE JULIETH RAUSEO GOMEZ</td>
+      <td>BARRANQUILLA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>GREGORIO ALFREDO SIERRA DEL VILLAR</td>
+      <td>10</td>
+      <td>10</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>JOHAN ALEXANDER RUIZ JORIGUA</td>
+      <td>HONDA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>CLARA INES BONILLA BASTIDAS</td>
+      <td>8</td>
+      <td>8</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>MARIA DEL SOCORRO NAVARRO ALVAREZ</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>JESSICA ISABEL BARRIOS CASTILLO</td>
+      <td>10</td>
+      <td>10</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>YACKSON PALOMEQUE MOSQUERA</td>
+      <td>QUIBDO</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>JOSE SANTANDER ROSALES MANJARRES</td>
+      <td>9</td>
+      <td>9</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>MARIANA SALAZAR DIAZ</td>
+      <td>MANIZALES</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>MILTON DAVID HERRERA RAMIREZ</td>
+      <td>8</td>
+      <td>8</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>SEBASTIAN GOMEZ CANO</td>
+      <td>MEDELLIN</td>
+      <td>Isabella Caro</td>
+      <td>Primera vez</td>
+      <td>LAURA NATALIA GIL AGUIRRE</td>
+      <td>10</td>
+      <td>10</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>HILLARY SARAY VANEGAS BUSTAMANTE</td>
+      <td>CARTAGENA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Renovacion</td>
+      <td>LAURA VICTORIA GUIO MAHECHA</td>
+      <td>10</td>
+      <td>60</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>RODRIGO CERVANTES CARDENAS</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>VANESSA MARIA GOMEZ GULFO</td>
+      <td>11</td>
+      <td>11</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>CARLOS ANDRES PUERTA ZABALA</td>
+      <td>ITAGUI</td>
+      <td>Isabella Caro</td>
+      <td>Primera vez</td>
+      <td>LAURA NATALIA GIL AGUIRRE</td>
+      <td>7</td>
+      <td>7</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>MARIA ISABEL BOHORQUEZ VERA</td>
+      <td>TUNJA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Renovacion</td>
+      <td>ANA ELISA ARGUMEDO VILLADIEGO</td>
+      <td>9</td>
+      <td>27</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>JORGE VALOIS LOPEZ ALARCON</td>
+      <td>YOPAL</td>
+      <td>Mabel Rodríguez</td>
+      <td>Primera vez</td>
+      <td>CRISTHIAN FABIAN ZORRO PATIÑO</td>
+      <td>22</td>
+      <td>22</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>JESUS ANGEL ESCORCIA RODRIGUEZ</td>
+      <td>BARRANQUILLA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>YESENIA DEL CARMEN PIANETTA (PRESCRIPTOR)/EVA LOPEZ (TRATANTE)</td>
+      <td>12</td>
+      <td>12</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>KELIS YOHANA MARRUGO MARRUGO</td>
+      <td>ARJONA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>JESSICA ISABEL BARRIOS CASTILLO</td>
+      <td>12</td>
+      <td>12</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>ELVIS JOSE GONZALEZ VELASQUEZ</td>
+      <td>BUCARAMANGA</td>
+      <td>Pablo Silva</td>
+      <td>Renovacion</td>
+      <td>DERLY JAIDY SANCHEZ PEÑA</td>
+      <td>29</td>
+      <td>87</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>JULIAN FRANCISCO OLAYA STAND</td>
+      <td>SOLEDAD</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>JOSE SANTANDER ROSALES MANJARRES</td>
+      <td>12</td>
+      <td>36</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>JOEL IGNACIO PAUTT ACEVEDO</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>JESSICA ISABEL BARRIOS CASTILLO</td>
+      <td>12</td>
+      <td>36</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>EVELYN TAILETH LOPEZ MANOSALVA</td>
+      <td>CUCUTA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>LAURA XIMENA FERNANDEZ CRUZ</td>
+      <td>9</td>
+      <td>9</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>JUAN ESTEBAN AGUIRRE JIMENEZ</td>
+      <td>BOGOTA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Renovacion</td>
+      <td>SANDRA LILIANA ARDILA SALAZAR</td>
+      <td>6</td>
+      <td>18</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>GLADYS ROZO ALVAREZ</td>
+      <td>BUCARAMANGA</td>
+      <td>Pablo Silva</td>
+      <td>Primera vez</td>
+      <td>DERLY JAIDY SANCHEZ PEÑA</td>
+      <td>8</td>
+      <td>8</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>JOSE JAVIER SALAS ALVARADO</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>RAMON ANTONIO QUINTERO ALMENAREZ</td>
+      <td>10</td>
+      <td>60</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>MIGUEL DE JESUS ACOSTA CARVAL</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>RAMON ANTONIO QUINTERO ALMENAREZ</td>
+      <td>16</td>
+      <td>48</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>YIMI DANIEL ACOSTA CARVAL</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>RAMON ANTONIO QUINTERO ALMENAREZ</td>
+      <td>14</td>
+      <td>42</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>RODRIGO TOFIÑO RIVERA</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>RAMON ANTONIO QUINTERO ALMENAREZ</td>
+      <td>16</td>
+      <td>16</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>LINA MARIA IBARRA PALACIOS</td>
+      <td>BOGOTA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>MANUEL ALEJANDRO LUNA LUNA</td>
+      <td>3</td>
+      <td>3</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>WAYNER GERARD RIVERA HERNANDEZ</td>
+      <td>BOGOTA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Renovacion</td>
+      <td>ANGIE KATHERINE CARDENAS ARIAS</td>
+      <td>10</td>
+      <td>30</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>DINORIS LEONOR HERRON DAZA</td>
+      <td>VALLEDUPAR</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>RAFAEL ANTONIO PAZ MACHACON</td>
+      <td>12</td>
+      <td>12</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>MARIA DUERLEY BENITEZ PEREA</td>
+      <td>QUIBDO</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>JOSE SANTANDER ROSALES MANJARRES</td>
+      <td>11</td>
+      <td>11</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>FABIO NELSON CASTILLO LOSADA</td>
+      <td>NEIVA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>ANA PAOLA BERRIO ALVAREZ</td>
+      <td>11</td>
+      <td>11</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>ELKIN FIERRO PUENTES</td>
+      <td>NEIVA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>ANA PAOLA BERRIO ALVAREZ</td>
+      <td>11</td>
+      <td>11</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>MARIANYELLY COROMOTO MEDINA BAEZ</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>JESSICA ISABEL BARRIOS CASTILLO</td>
+      <td>14</td>
+      <td>14</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>MARIA JOSE MORENO MARMOL</td>
+      <td>PIEDECUESTA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>MILTON DAVID HERRERA RAMIREZ</td>
+      <td>15</td>
+      <td>15</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>MIA ANTONELLA ENCISO PIRA</td>
+      <td>BOGOTA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>ANGIE CATHERINE CARDENAS ARIAS</td>
+      <td>10</td>
+      <td>10</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>LUISA FERNANDA JIMENEZ MONTEALEGRE</td>
+      <td>BOGOTA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Renovacion</td>
+      <td>JENNYFER VIVIANA MARTINEZ PARDO</td>
+      <td>7</td>
+      <td>21</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>RAY RONALD GOMEZ RODRIGUEZ</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>JESSICA ISABEL BARRIOS CASTILLO</td>
+      <td>12</td>
+      <td>12</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>GLADYS ROZO ALVAREZ</td>
+      <td>BUCARAMANGA</td>
+      <td>Pablo Silva</td>
+      <td>Renovacion</td>
+      <td>DERLY JAIDY SANCHEZ PEÑA</td>
+      <td>12</td>
+      <td>12</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge AMARILLO">AMARILLO</span></td>
+    </tr>
+    <tr>
+      <td>MIGUEL ALEXANDER MARTINEZ BETANCOURT</td>
+      <td>PIEDECUESTA</td>
+      <td>Pablo Silva</td>
+      <td>Renovacion</td>
+      <td>OSCAR DAVID PEÑUELA VASQUEZ</td>
+      <td>17</td>
+      <td>51</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>NICOLAS MATHEUS BARRERA RINCON</td>
+      <td>TUNJA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Renovacion</td>
+      <td>JULIETH CAMILA PERICO TORRES</td>
+      <td>24</td>
+      <td>72</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>DANIEL SANTIAGO VARGAS</td>
+      <td>MONIQUIRA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Primera vez</td>
+      <td>YULECI LAVEDE PLAZAS</td>
+      <td>0</td>
+      <td>0</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>CAMILO ANDRES RIVERA POLO</td>
+      <td>SOLEDAD</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>GLORIA INES GARCIA MAESTRE</td>
+      <td>12</td>
+      <td>36</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>LESLY GINNETH LIZARAZO CALA</td>
+      <td>SANTANDER</td>
+      <td>Ángela Bohórquez</td>
+      <td>Renovacion</td>
+      <td>ANA P. BERRIO</td>
+      <td>7</td>
+      <td>21</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>JESUS OMAR LOPEZ BUESAQUILLO</td>
+      <td>CALI</td>
+      <td>Carolina Ardila</td>
+      <td>Primera vez</td>
+      <td>CARLOS ANDRES CLAVIJO PRADO</td>
+      <td>10</td>
+      <td>10</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>MAXIMILIANO SERNA</td>
+      <td>CALI</td>
+      <td>Carolina Ardila</td>
+      <td>Renovacion</td>
+      <td>CARLOS ANDRES CLAVIJO PRADO</td>
+      <td>10</td>
+      <td>30</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>CRISTIAN ANDRES RUIZ AVILA</td>
+      <td>TUNJA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Primera vez</td>
+      <td>JULIETH CAMILA PERICO TORRES</td>
+      <td>7</td>
+      <td>7</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>EMMA ISABELLA GONZALEZ GONZALEZ</td>
+      <td>BOGOTA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Renovacion</td>
+      <td>DANIELA FERNANDA MEJIA PARRA</td>
+      <td>6</td>
+      <td>18</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>MARIA DEL SOCORRO NAVARRO ALVAREZ</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>JESSICA ISABEL BARRIOS CASTILLO</td>
+      <td>10</td>
+      <td>10</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>YACKSON PALOMEQUE MOSQUERA</td>
+      <td>QUIBDO</td>
+      <td>Esmeralda Díaz</td>
+      <td>Renovacion</td>
+      <td>JOSE SANTANDER ROSALES MANJARRES</td>
+      <td>9</td>
+      <td>27</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>MAXIMILIANO SERNA MORALES</td>
+      <td>MEDELLIN</td>
+      <td>Isabella Caro</td>
+      <td>Primera vez</td>
+      <td>KATERINE CARRASQUILLA FRANCO</td>
+      <td>8</td>
+      <td>8</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>JUAN DAVID CORDERO RUIZ</td>
+      <td>TUNJA</td>
+      <td>Mabel Rodríguez</td>
+      <td>Renovacion</td>
+      <td>LILIANA YOLANDA VEGA HIGUERA</td>
+      <td>11</td>
+      <td>33</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>JUAN ANGEL GOMEZ GOMEZ</td>
+      <td>ABREGO</td>
+      <td>Pablo Silva</td>
+      <td>Renovacion</td>
+      <td>YANSON ALBERTO MONTAÑO MANJARRES</td>
+      <td>8</td>
+      <td>24</td>
+      <td><span class="badge VERDE">VERDE</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>JAYSON LEANDRO ANGULO ORDOÑEZ</td>
+      <td>CARTAGENA</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>VANESSA MARIA GOMEZ GULFO</td>
+      <td>10</td>
+      <td>10</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>MAXIMILIANO JIMENEZ QUINTERO</td>
+      <td>SOLEDAD</td>
+      <td>Esmeralda Díaz</td>
+      <td>Primera vez</td>
+      <td>ADOLFO ENRIQUE ALVAREZ  MONTAÑEZ</td>
+      <td>25</td>
+      <td>25</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>SAMUEL DAVID FABRA ANAYA</td>
+      <td>BUCARAMANGA</td>
+      <td>Pablo Silva</td>
+      <td>Primera vez</td>
+      <td>DERLY JAIDY SANCHEZ PEÑA</td>
+      <td>18</td>
+      <td>18</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>MARIA PAULA ALVIRA SANCHEZ</td>
+      <td>BOGOTA</td>
+      <td>Ángela Bohórquez</td>
+      <td>Primera vez</td>
+      <td>LAURA VICTORIA GUIO MAHECHA</td>
+      <td>10</td>
+      <td>10</td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+      <td><span class="badge ROJO">ROJO</span></td>
+    </tr>
+    <tr>
+      <td>ISABEL CRISTINA SUCERQUIA DIAZ</td>
+      <td>Sin dato</td>
+      <td>Sin dato</td>
+      <td></td>
+      <td>Sin dato</td>
+      <td>0</td>
+      <td>0</td>
+      <td></td>
+      <td></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>GABRIELA MAZO ZAFRA</td>
+      <td>Sin dato</td>
+      <td>Sin dato</td>
+      <td></td>
+      <td>Sin dato</td>
+      <td>0</td>
+      <td>0</td>
+      <td></td>
+      <td></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>SARA ISABEL MEJIA ARCILA</td>
+      <td>Sin dato</td>
+      <td>Sin dato</td>
+      <td></td>
+      <td>Sin dato</td>
+      <td>0</td>
+      <td>0</td>
+      <td></td>
+      <td></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr>
+    <tr>
+      <td>ALEJANDRO CORREA TRUJILLO</td>
+      <td>Sin dato</td>
+      <td>Sin dato</td>
+      <td></td>
+      <td>Sin dato</td>
+      <td>0</td>
+      <td>0</td>
+      <td></td>
+      <td></td>
+      <td><span class="badge VERDE">VERDE</span></td>
+    </tr></tbody>
+          </table>
+        </div>
+        <div class="table-foot" id="tableFoot">Mostrando 108 de 108 pacientes</div>
+      </div>
+
+      <p class="footnote">
+        <b>Notas de cálculo:</b> “Pacientes activos” cuenta filas con ESTADO = Activo. “MIPRES primera vez / en renovación” usan la columna Tipo MIPRES.
+        “Entregas registradas” suma <b>todas</b> las fechas diligenciadas en Fecha de entrega 1, 2, 3, 4, 5 y 6 de todos los pacientes filtrados (cada fecha cuenta como una entrega, tomando la fecha como referencia — no el número de pacientes distintos).
+        “Latas formuladas/mes” suma la columna Latas Mes; “Latas ingresadas” suma Latas Totales; “Latas entregadas” multiplica el número de entregas registradas de cada paciente por su Latas Mes.
+        Los estados de aprobación y de entrega se recalculan a partir de Sí/No/fecha, en vez de tomar las columnas de estado del Excel (que pueden traer errores de fórmula al exportarse).
+        Ajusta esta lógica si tu operación define alguno de estos indicadores de otra forma.
+      </p>
+
+    </div>
+  </div>
+
+<script>
+/* ============================================================
+   Utilidades
+   ============================================================ */
+const MESES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+function norm(s){
+  if (s === null || s === undefined) return '';
+  return s.toString().trim().toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/\s+/g,' ');
+}
+function siNo(v){
+  const n = norm(v);
+  if (n === 'SI' || n === 'SÍ') return 'SI';
+  if (n === 'NO') return 'NO';
+  return null;
+}
+function toDate(v){
+  if (v === null || v === undefined || v === '') return null;
+  if (v instanceof Date && !isNaN(v)) return v;
+  if (typeof v === 'number'){
+    const d = XLSX.SSF.parse_date_code(v);
+    if (!d) return null;
+    return new Date(d.y, d.m-1, d.d);
+  }
+  const parsed = new Date(v);
+  return isNaN(parsed) ? null : parsed;
+}
+function monthKey(d){ return d ? (d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')) : null; }
+function monthLabel(key){
+  const [y,m] = key.split('-');
+  return MESES[parseInt(m,10)-1] + ' ' + y;
+}
+function fmtInt(n){ return Math.round(n).toLocaleString('es-CO'); }
+
+/* Header keys we look for -> internal field name */
+const HEADER_MAP = {
+  'ESTADO':'estado',
+  'CUIDAD':'ciudad',
+  'CIUDAD':'ciudad',
+  'VISITADOR MEDICO':'visitador',
+  'EPS':'eps',
+  'IPS':'ips',
+  'PROFESIONAL QUE PRESCRIBE':'profesional',
+  'TIPO MIPRES':'tipoMipres',
+  'FECHA INGRESO A P2D':'fechaIngreso',
+  'LATAS TOTALES':'latasTotales',
+  'LATAS MES':'latasMes',
+  'MIPRES APROBADO EN IPS':'aprobadoIPS',
+  'FECHA APROBACION IPS':'fechaAprobIPS',
+  'MIPRES APROBADO EPS & DIRECCIONADO':'aprobadoEPS',
+  'FECHA APROBACION EN EPS':'fechaAprobEPS',
+  'OPERADOR LOGISTICO ENCARGADO':'operador',
+  'ENTREGADO DE OPL AL PACIENTE':'entregadoOPL',
+  'FECHA DE ENTREGA 1':'fEntrega1',
+  'FECHA DE ENTREGA 2':'fEntrega2',
+  'FECHA DE ENTREGA 3':'fEntrega3',
+  'FECHA DE ENTREGA 4':'fEntrega4',
+  'FECHA DE ENTREGA 5':'fEntrega5',
+  'FECHA DE ENTREGA 6':'fEntrega6',
+  'NOMBRE':'nombre',
+  '# DOCUMENTO':'documento'
+};
+
+/* ============================================================
+   Estado global
+   ============================================================ */
+let RAW = [];       // filas crudas (objetos ya mapeados)
+let CHARTS = {};     // instancias Chart.js para poder destruirlas al recargar
+
+if (window.Chart && window.ChartDataLabels){
+  Chart.register(ChartDataLabels);
+  Chart.defaults.set('plugins.datalabels', {
+    color:'#3a2f47',
+    font:{ family:"'Manrope',sans-serif", weight:800, size:10 },
+    formatter: v => (v===0||v===null||v===undefined) ? '' : fmtInt(v)
+  });
+}
+
+/* ============================================================
+   Carga y parseo del archivo
+   ============================================================ */
+document.getElementById('fileInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      const data = new Uint8Array(evt.target.result);
+      const wb = XLSX.read(data, {type:'array', cellDates:true});
+      const sheetName = wb.SheetNames.find(n => norm(n).includes('KETOLANCE')) || wb.SheetNames[0];
+      const ws = wb.Sheets[sheetName];
+      const rows = XLSX.utils.sheet_to_json(ws, {header:1, defval:null, raw:true});
+
+      // Si el archivo trae una hoja de entregas en formato largo (una fila
+      // por entrega, con Documento + Fecha), la usamos como fuente de
+      // verdad para las entregas: puede tener MÁS de 6 entregas por
+      // paciente, y evita depender de que las 6 columnas anchas estén
+      // siempre copiadas/actualizadas.
+      const sheetNameEntregas = wb.SheetNames.find(n => n !== sheetName && norm(n).includes('ENTREGA'));
+      let deliveriesMap = null;
+      if (sheetNameEntregas){
+        const entRows = XLSX.utils.sheet_to_json(wb.Sheets[sheetNameEntregas], {header:1, defval:null, raw:true});
+        deliveriesMap = buildDeliveriesMap(entRows);
+      }
+
+      parseRows(rows, deliveriesMap);
+      document.getElementById('updatedText').innerHTML =
+        'Archivo: <b>'+file.name+'</b><br>Cargado '+ new Date().toLocaleString('es-CO') +
+        (deliveriesMap ? '<br>Entregas desde hoja "'+sheetNameEntregas+'"' : '');
+      document.getElementById('emptyState').style.display = 'none';
+      document.getElementById('dashboard').classList.add('visible');
+      buildFilterOptions();
+      render();
+    }catch(err){
+      alert('No se pudo leer el archivo. Verifica que sea el Excel de seguimiento (.xlsx). Detalle: '+err.message);
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function normDoc(v){
+  if (v === null || v === undefined || v === '') return '';
+  let s = v.toString().trim();
+  if (/^\d+\.0$/.test(s)) s = s.slice(0, -2); // normaliza "123.0" -> "123"
+  return s.toUpperCase();
+}
+
+/* Construye un mapa Documento -> {dates:[...], nombre} a partir de la hoja
+   larga (Nombre, Documento, Fecha, N° Entrega). Detecta el encabezado
+   buscando una fila que tenga tanto "DOCUMENTO" como "FECHA". */
+function buildDeliveriesMap(rows){
+  let headerIdx = -1;
+  for (let i=0;i<Math.min(rows.length,5);i++){
+    const r = rows[i] || [];
+    const norms = r.map(norm);
+    if (norms.includes('DOCUMENTO') && norms.includes('FECHA')){ headerIdx = i; break; }
+  }
+  if (headerIdx === -1) return null;
+
+  const header = rows[headerIdx];
+  let colDoc = -1, colFecha = -1, colNombre = -1;
+  header.forEach((c, idx) => {
+    const n = norm(c);
+    if (n === 'DOCUMENTO') colDoc = idx;
+    if (n === 'FECHA') colFecha = idx;
+    if (n === 'NOMBRE') colNombre = idx;
+  });
+  if (colDoc === -1 || colFecha === -1) return null;
+
+  const map = {};
+  for (let r = headerIdx+1; r < rows.length; r++){
+    const row = rows[r];
+    if (!row) continue;
+    const doc = normDoc(row[colDoc]);
+    const fecha = toDate(row[colFecha]);
+    if (!doc || !fecha) continue;
+    if (!map[doc]) map[doc] = { dates: [], nombre: colNombre !== -1 ? (row[colNombre]||'').toString().trim() : '' };
+    map[doc].dates.push(fecha);
+  }
+  return map;
+}
+
+function parseRows(rows, deliveriesMap){
+  let headerRowIdx = -1;
+  for (let i=0;i<Math.min(rows.length,8);i++){
+    const r = rows[i] || [];
+    if (r.some(c => norm(c) === 'ESTADO')){ headerRowIdx = i; break; }
+  }
+  if (headerRowIdx === -1) headerRowIdx = 0;
+
+  const headerRow = rows[headerRowIdx] || [];
+  const colIndex = {};
+  headerRow.forEach((cell, idx) => {
+    const key = HEADER_MAP[norm(cell)];
+    if (key && !(key in colIndex)) colIndex[key] = idx;
+  });
+
+  const out = [];
+  const usedDocs = new Set(); // documentos de ENTREGAS ya asignados a una fila (evita doble conteo si el documento se repite en KETOLANCE)
+  for (let r = headerRowIdx+1; r < rows.length; r++){
+    const row = rows[r];
+    if (!row) continue;
+    const estadoVal = colIndex.estado !== undefined ? row[colIndex.estado] : null;
+    const nombreVal = colIndex.nombre !== undefined ? row[colIndex.nombre] : null;
+    if ((estadoVal === null || estadoVal === '') && (nombreVal === null || nombreVal === '')) continue;
+
+    const get = (k) => colIndex[k] !== undefined ? row[colIndex[k]] : null;
+
+    const docKey = normDoc(get('documento'));
+    const entregasWide = [1,2,3,4,5,6].map(n => toDate(get('fEntrega'+n))).filter(Boolean);
+    let entregas;
+    if (deliveriesMap && docKey && deliveriesMap[docKey]){
+      if (!usedDocs.has(docKey)){
+        entregas = deliveriesMap[docKey].dates;
+        usedDocs.add(docKey);
+      } else {
+        entregas = []; // fila duplicada del mismo documento: sus entregas ya se contaron arriba
+      }
+    } else {
+      entregas = entregasWide; // no hay hoja ENTREGAS, o este documento no aparece ahí
+    }
+
+    out.push({
+      estado: norm(get('estado')),
+      ciudad: (get('ciudad')||'').toString().trim() || 'Sin dato',
+      visitador: (get('visitador')||'').toString().trim() || 'Sin dato',
+      eps: (get('eps')||'').toString().trim() || 'Sin dato',
+      ips: (get('ips')||'').toString().trim() || 'Sin dato',
+      profesional: (get('profesional')||'').toString().trim() || 'Sin dato',
+      tipoMipres: norm(get('tipoMipres')),
+      fechaIngreso: toDate(get('fechaIngreso')),
+      latasTotales: parseFloat(get('latasTotales')) || 0,
+      latasMes: parseFloat(get('latasMes')) || 0,
+      aprobadoIPS: siNo(get('aprobadoIPS')),
+      aprobadoEPS: siNo(get('aprobadoEPS')),
+      operador: (get('operador')||'').toString().trim() || 'Sin dato',
+      entregadoOPL: siNo(get('entregadoOPL')),
+      entregas: entregas,
+      nombre: (get('nombre')||'').toString().trim() || 'Sin nombre',
+    });
+  }
+
+  // Entregas de la hoja ENTREGAS cuyo documento no corresponde a ningún
+  // paciente de KETOLANCE: se agregan como registros "huérfanos" para que
+  // no desaparezcan de los totales y del gráfico mensual (aunque no
+  // puedan aportar Ciudad/EPS/Profesional porque no hay de dónde tomarlos).
+  if (deliveriesMap){
+    Object.keys(deliveriesMap).forEach(docKey => {
+      if (usedDocs.has(docKey)) return;
+      const entry = deliveriesMap[docKey];
+      out.push({
+        estado:'', ciudad:'Sin dato', visitador:'Sin dato', eps:'Sin dato', ips:'Sin dato',
+        profesional:'Sin dato', tipoMipres:'', fechaIngreso:null,
+        latasTotales:0, latasMes:0, aprobadoIPS:null, aprobadoEPS:null,
+        operador:'Sin dato', entregadoOPL:null, entregas: entry.dates,
+        nombre: entry.nombre || 'Sin nombre (no está en KETOLANCE)',
+      });
+    });
+  }
+
+  RAW = out;
+}
+
+function reviveData(arr){
+  return (arr||[]).map(p => ({
+    ...p,
+    fechaIngreso: p.fechaIngreso ? new Date(p.fechaIngreso) : null,
+    entregas: (p.entregas||[]).map(d => new Date(d)).filter(d=>!isNaN(d))
+  }));
+}
+
+/* estados calculados */
+function estadoAprobacion(v){
+  if (v === 'SI') return 'VERDE';
+  if (v === 'NO') return 'ROJO';
+  return 'AMARILLO';
+}
+function estadoEntrega(p){
+  if (p.entregas.length > 0) return 'VERDE';
+  if (p.entregadoOPL === 'NO') return 'ROJO';
+  return 'AMARILLO';
+}
+
+/* Versiones para la tabla "Detalle de pacientes": a diferencia de las de
+   arriba (usadas en los gráficos, donde una celda vacía se cuenta como
+   "Amarillo"/pendiente), aquí una celda vacía en el Excel debe verse
+   vacía en la tabla, sin badge ni color. */
+function estadoAprobacionCelda(v){
+  if (v === 'SI') return 'VERDE';
+  if (v === 'NO') return 'ROJO';
+  return null; // celda en blanco en el Excel -> celda en blanco en la tabla
+}
+function estadoEntregaCelda(p){
+  if (p.entregas.length > 0) return 'VERDE';
+  if (p.entregadoOPL === 'NO') return 'ROJO';
+  if (p.entregadoOPL === 'SI') return 'AMARILLO';
+  return null; // "ENTREGADO DE OPL AL PACIENTE" en blanco y sin fecha de entrega -> celda en blanco
+}
+function badgeCell(estado){
+  return estado ? `<span class="badge ${estado}">${estado}</span>` : '';
+}
+
+/* ============================================================
+   Filtros
+   ============================================================ */
+function uniqueSorted(arr){
+  return [...new Set(arr)].filter(v => v && v !== 'Sin dato').sort((a,b)=>a.localeCompare(b,'es'));
+}
+function buildFilterOptions(){
+  fillSelect('f-eps', uniqueSorted(RAW.map(p=>p.eps)));
+  fillSelect('f-ciudad', uniqueSorted(RAW.map(p=>p.ciudad)));
+  fillSelect('f-profesional', uniqueSorted(RAW.map(p=>p.profesional)));
+  fillSelect('f-visitador', uniqueSorted(RAW.map(p=>p.visitador)));
+
+  const mesesSet = new Set();
+  RAW.forEach(p => p.entregas.forEach(d => mesesSet.add(monthKey(d))));
+  const meses = [...mesesSet].sort();
+  const sel = document.getElementById('f-mes');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Todos</option>' +
+    meses.map(k => `<option value="${k}">${monthLabel(k)}</option>`).join('');
+  if (meses.includes(current)) sel.value = current;
+}
+function fillSelect(id, values){
+  const sel = document.getElementById(id);
+  const current = sel.value;
+  sel.innerHTML = `<option value="">Todas</option>` +
+    values.map(v => `<option value="${v}">${v}</option>`).join('');
+  if (values.includes(current)) sel.value = current;
+}
+['f-eps','f-ciudad','f-profesional','f-visitador','f-mes'].forEach(id=>{
+  document.getElementById(id).addEventListener('change', render);
+});
+document.getElementById('clearFilters').addEventListener('click', ()=>{
+  ['f-eps','f-ciudad','f-profesional','f-visitador','f-mes'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+  render();
+});
+document.getElementById('tableSearch').addEventListener('input', render);
+
+function filteredRows(){
+  const eps = document.getElementById('f-eps').value;
+  const ciudad = document.getElementById('f-ciudad').value;
+  const profesional = document.getElementById('f-profesional').value;
+  const visitador = document.getElementById('f-visitador').value;
+  const mes = document.getElementById('f-mes').value;
+
+  return RAW.filter(p=>{
+    if (eps && p.eps !== eps) return false;
+    if (ciudad && p.ciudad !== ciudad) return false;
+    if (profesional && p.profesional !== profesional) return false;
+    if (visitador && p.visitador !== visitador) return false;
+    if (mes){
+      const hasDeliveryInMonth = p.entregas.some(d => monthKey(d) === mes);
+      if (!hasDeliveryInMonth) return false;
+    }
+    return true;
+  });
+}
+
+/* si hay filtro de mes activo, las entregas que se cuentan/suman se acotan a ese mes */
+function entregasEnFiltro(p){
+  const mes = document.getElementById('f-mes').value;
+  if (!mes) return p.entregas;
+  return p.entregas.filter(d => monthKey(d) === mes);
+}
+
+/* ============================================================
+   Render principal
+   ============================================================ */
+function render(){
+  const rows = filteredRows();
+  renderKPIs(rows);
+  renderChartMeses(rows);
+  renderChartOperador(rows);
+  renderTopIPS(rows);
+  renderEstadoChart('chartEstadoIPS', rows, p => estadoAprobacion(p.aprobadoIPS));
+  renderEstadoChart('chartEstadoEPS', rows, p => estadoAprobacion(p.aprobadoEPS));
+  renderEstadoChart('chartEstadoEntrega', rows, p => estadoEntrega(p));
+  renderCountChart('chartCiudad', rows, p=>p.ciudad, {horizontal:false, top:10, filterField:'f-ciudad'});
+  renderCountChart('chartEPS', rows, p=>p.eps, {horizontal:true, top:10, filterField:'f-eps'});
+  renderDonut('chartProfesionales', rows, p=>p.profesional, 10, 'f-profesional');
+  renderCountChart('chartVisitador', rows, p=>p.visitador, {horizontal:true, top:12, filterField:'f-visitador'});
+  renderTable(rows);
+}
+
+function computeYearLabel(rows){
+  const years = new Set();
+  rows.forEach(p=>{
+    if (p.fechaIngreso) years.add(p.fechaIngreso.getFullYear());
+    p.entregas.forEach(d=>years.add(d.getFullYear()));
+  });
+  if (years.size === 0) return '';
+  const arr = [...years].sort((a,b)=>a-b);
+  return arr.length === 1 ? String(arr[0]) : (arr[0]+'–'+arr[arr.length-1]);
+}
+
+function renderKPIs(rows){
+  const activos = rows.filter(p=>p.estado==='ACTIVO').length;
+  const primeraVez = rows.filter(p=>p.tipoMipres.includes('PRIMERA')).length;
+  const renovacion = rows.filter(p=>p.tipoMipres.includes('RENOVACION')).length;
+  const entregasMipres = rows.reduce((s,p)=>s+entregasEnFiltro(p).length,0);
+  const latasMesTotal = rows.reduce((s,p)=>s+p.latasMes,0);
+  const latasTotalesTotal = rows.reduce((s,p)=>s+p.latasTotales,0);
+  const latasEntregadas = rows.reduce((s,p)=> s + entregasEnFiltro(p).length * p.latasMes, 0);
+  const yr = computeYearLabel(rows);
+  const y = yr ? ' ' + yr : '';
+
+  const kpis = [
+    {icon:'🧑‍⚕️', label:'Pacientes activos'+y, value: fmtInt(activos), accent:'var(--pink)'},
+    {icon:'🆕', label:'MIPRES primera vez'+y, value: fmtInt(primeraVez), accent:'var(--blue)'},
+    {icon:'🔁', label:'MIPRES en renovación'+y, value: fmtInt(renovacion), accent:'var(--blue)'},
+    {icon:'📦', label:'Entregas registradas'+y, value: fmtInt(entregasMipres), accent:'var(--pink)'},
+    {icon:'🥫', label:'Latas formuladas / mes'+y, value: fmtInt(latasMesTotal), accent:'var(--amber)'},
+    {icon:'🚚', label:'Latas entregadas'+y, value: fmtInt(latasEntregadas), accent:'var(--green)'},
+    {icon:'📥', label:'Latas ingresadas'+y, value: fmtInt(latasTotalesTotal), accent:'var(--pink-deep)'},
+  ];
+  document.getElementById('kpiRow').innerHTML = kpis.map(k=>`
+    <div class="kpi" style="--accent:${k.accent}">
+      <span class="icon">${k.icon}</span>
+      <div class="label">${k.label}</div>
+      <div class="value">${k.value}</div>
+    </div>`).join('');
+}
+
+/* Activa/desactiva un filtro al hacer clic sobre una barra o segmento
+   de una gráfica. Si ya estaba activo ese valor, un segundo clic lo quita. */
+function toggleFilterValue(selectId, value){
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.value = (sel.value === value) ? '' : value;
+  render();
+}
+function pointerCursor(evt, elements){
+  evt.native.target.style.cursor = elements.length ? 'pointer' : 'default';
+}
+
+function destroyChart(id){ if (CHARTS[id]){ CHARTS[id].destroy(); delete CHARTS[id]; } }
+
+const PALETTE = ['#E0197D','#1D5FE0','#D69A1F','#1E9E6B','#8A4FD6','#D8385B','#17A398','#B01267','#5B6EE1','#C2790B'];
+
+function renderChartMeses(rows){
+  const byMonth = {};
+  rows.forEach(p=>{
+    const k = monthKey(p.fechaIngreso);
+    if (!k) return;
+    byMonth[k] = byMonth[k] || {pacientes:0, latasMes:0};
+    byMonth[k].pacientes += 1;
+    byMonth[k].latasMes += p.latasMes;
+  });
+  const deliveryCountByMonth = {};
+  const deliveryLatasByMonth = {};
+  rows.forEach(p=>{
+    p.entregas.forEach(d=>{
+      const k = monthKey(d);
+      deliveryCountByMonth[k] = (deliveryCountByMonth[k]||0) + 1;
+      deliveryLatasByMonth[k] = (deliveryLatasByMonth[k]||0) + p.latasMes;
+    });
+  });
+  const keys = [...new Set([...Object.keys(byMonth), ...Object.keys(deliveryCountByMonth)])].sort();
+  const labels = keys.map(monthLabel);
+  const activeMes = document.getElementById('f-mes').value;
+  const pacientesColors = keys.map(k => !activeMes ? '#E0197D' : (k === activeMes ? '#3a2f47' : '#F3D6E6'));
+
+  destroyChart('chartMeses');
+  const ctx = document.getElementById('chartMeses');
+  CHARTS.chartMeses = new Chart(ctx, {
+    data:{
+      labels,
+      datasets:[
+        {type:'bar', label:'Pacientes', data:keys.map(k=>byMonth[k]?byMonth[k].pacientes:0), backgroundColor:pacientesColors, order:3, yAxisID:'y'},
+        {type:'line', label:'Entregas (Fecha 1-6)', data:keys.map(k=>deliveryCountByMonth[k]||0), borderColor:'#1E9E6B', backgroundColor:'#1E9E6B', tension:.35, order:1, yAxisID:'y', pointRadius:3, datalabels:{align:'top', color:'#1E9E6B'}},
+        {type:'bar', label:'Latas / mes', data:keys.map(k=>byMonth[k]?byMonth[k].latasMes:0), backgroundColor:'#1D5FE0', order:4, yAxisID:'y1'},
+        {type:'line', label:'Latas entregadas', data:keys.map(k=>deliveryLatasByMonth[k]||0), borderColor:'#D69A1F', backgroundColor:'#D69A1F', tension:.35, order:2, yAxisID:'y1', pointRadius:3, datalabels:{align:'bottom', color:'#B07E12'}},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{mode:'index', intersect:false},
+      onClick: (evt, elements) => {
+        if (!elements.length) return;
+        const idx = elements[0].index;
+        toggleFilterValue('f-mes', keys[idx]);
+      },
+      onHover: pointerCursor,
+      plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:10.5}}}},
+      scales:{
+        y:{ position:'left', title:{display:true,text:'Pacientes / entregas',font:{size:10}}, grid:{color:'#F1E7EE'} },
+        y1:{ position:'right', title:{display:true,text:'Latas',font:{size:10}}, grid:{display:false} },
+        x:{ grid:{display:false} }
+      }
+    }
+  });
+}
+
+function renderChartOperador(rows){
+  const byOp = {};
+  rows.forEach(p=>{
+    byOp[p.operador] = byOp[p.operador] || {pacientes:0, latas:0};
+    byOp[p.operador].pacientes += 1;
+    byOp[p.operador].latas += entregasEnFiltro(p).length * p.latasMes;
+  });
+  const keys = Object.keys(byOp).sort((a,b)=>byOp[b].pacientes-byOp[a].pacientes).slice(0,10);
+
+  destroyChart('chartOperador');
+  CHARTS.chartOperador = new Chart(document.getElementById('chartOperador'),{
+    data:{
+      labels:keys,
+      datasets:[
+        {type:'bar', label:'Pacientes', data:keys.map(k=>byOp[k].pacientes), backgroundColor:'#1D5FE0', datalabels:{anchor:'end',align:'top'}},
+        {type:'bar', label:'Latas entregadas', data:keys.map(k=>byOp[k].latas), backgroundColor:'#E0197D', datalabels:{anchor:'end',align:'top'}},
+      ]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom', labels:{boxWidth:10, font:{size:11}}}},
+      scales:{ x:{ ticks:{ font:{size:10}, maxRotation:40, minRotation:20 }, grid:{display:false} }, y:{ grid:{color:'#F1E7EE'} } }
+    }
+  });
+}
+
+function renderTopIPS(rows){
+  const byIPS = {};
+  rows.forEach(p=>{ byIPS[p.ips] = (byIPS[p.ips]||0)+1; });
+  const entries = Object.entries(byIPS).filter(([k])=>k!=='Sin dato').sort((a,b)=>b[1]-a[1]).slice(0,9);
+  const max = entries.length ? entries[0][1] : 1;
+  const el = document.getElementById('topIpsTable');
+  el.innerHTML = entries.map(([name,count],i)=>`
+    <tr>
+      <td class="rank">${i+1}.</td>
+      <td class="name">${name}<div class="bar-mini" style="width:${(count/max*100).toFixed(0)}%"></div></td>
+      <td class="num">${count}</td>
+    </tr>`).join('') || '<tr><td>Sin datos</td></tr>';
+}
+
+function renderEstadoChart(id, rows, getEstado){
+  const counts = {VERDE:0, ROJO:0, AMARILLO:0};
+  rows.forEach(p=>{ counts[getEstado(p)]++; });
+  destroyChart(id);
+  CHARTS[id] = new Chart(document.getElementById(id),{
+    type:'bar',
+    data:{
+      labels:['Verde','Rojo','Amarillo'],
+      datasets:[{ data:[counts.VERDE,counts.ROJO,counts.AMARILLO], backgroundColor:['#1E9E6B','#D8385B','#D69A1F'], borderRadius:8,
+        datalabels:{anchor:'end', align:'top', color:'#3a2f47'} }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}},
+      scales:{ x:{grid:{display:false}}, y:{ beginAtZero:true, grid:{color:'#F1E7EE'} } }
+    }
+  });
+}
+
+function renderCountChart(id, rows, keyFn, opts){
+  opts = opts||{};
+  const counts = {};
+  rows.forEach(p=>{ const k = keyFn(p); if(!k||k==='Sin dato') return; counts[k]=(counts[k]||0)+1; });
+  const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0, opts.top||10);
+  const activeVal = opts.filterField ? document.getElementById(opts.filterField).value : '';
+  const baseColor = opts.horizontal ? '#1D5FE0' : '#E0197D';
+  const colors = entries.map(([label]) => {
+    if (!activeVal) return baseColor;
+    return label === activeVal ? '#3a2f47' : '#E4D9E0';
+  });
+  destroyChart(id);
+  CHARTS[id] = new Chart(document.getElementById(id),{
+    type:'bar',
+    data:{ labels:entries.map(e=>e[0]), datasets:[{ data:entries.map(e=>e[1]), backgroundColor:colors, borderRadius:8,
+      datalabels: opts.horizontal ? {anchor:'end', align:'right', color:'#3a2f47'} : {anchor:'end', align:'top', color:'#3a2f47'} }] },
+    options:{
+      indexAxis: opts.horizontal ? 'y' : 'x',
+      responsive:true, maintainAspectRatio:false,
+      onClick: (evt, elements) => {
+        if (!elements.length || !opts.filterField) return;
+        const idx = elements[0].index;
+        toggleFilterValue(opts.filterField, entries[idx][0]);
+      },
+      onHover: opts.filterField ? pointerCursor : undefined,
+      plugins:{legend:{display:false}},
+      layout: opts.horizontal ? {padding:{right:22}} : {padding:{top:14}},
+      scales:{
+        x:{ grid: opts.horizontal? {color:'#F1E7EE'} : {display:false}, ticks:{font:{size:10}} },
+        y:{ grid: opts.horizontal? {display:false} : {color:'#F1E7EE'}, ticks:{font:{size:10}} }
+      }
+    }
+  });
+}
+
+function renderDonut(id, rows, keyFn, top, filterField){
+  const counts = {};
+  rows.forEach(p=>{ const k=keyFn(p); if(!k||k==='Sin dato') return; counts[k]=(counts[k]||0)+1; });
+  const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0, top);
+  const activeVal = filterField ? document.getElementById(filterField).value : '';
+  const colors = entries.map(([label], i) => {
+    if (!activeVal) return PALETTE[i % PALETTE.length];
+    return label === activeVal ? PALETTE[i % PALETTE.length] : '#E4D9E0';
+  });
+  destroyChart(id);
+  CHARTS[id] = new Chart(document.getElementById(id),{
+    type:'doughnut',
+    data:{ labels:entries.map(e=>e[0]), datasets:[{ data:entries.map(e=>e[1]), backgroundColor:colors, borderWidth:2, borderColor:'#fff' }] },
+    options:{
+      responsive:true, maintainAspectRatio:false, cutout:'62%',
+      onClick: (evt, elements) => {
+        if (!elements.length || !filterField) return;
+        const idx = elements[0].index;
+        toggleFilterValue(filterField, entries[idx][0]);
+      },
+      onHover: filterField ? pointerCursor : undefined,
+      plugins:{
+        legend:{ position:'right', labels:{ boxWidth:9, font:{size:10} } },
+        datalabels:{ color:'#fff', font:{weight:800,size:10.5},
+          formatter:(v)=> v }
+      }
+    }
+  });
+}
+
+function renderTable(rows){
+  const q = norm(document.getElementById('tableSearch').value);
+  const filtered = q ? rows.filter(p => norm(p.nombre).includes(q) || norm(p.ciudad).includes(q) || norm(p.profesional).includes(q) || norm(p.eps).includes(q)) : rows;
+  const body = document.getElementById('tableBody');
+  body.innerHTML = filtered.slice(0,500).map(p=>`
+    <tr>
+      <td>${p.nombre}</td>
+      <td>${p.ciudad}</td>
+      <td>${p.visitador}</td>
+      <td>${p.tipoMipres.charAt(0)+p.tipoMipres.slice(1).toLowerCase()}</td>
+      <td>${p.profesional}</td>
+      <td>${fmtInt(p.latasMes)}</td>
+      <td>${fmtInt(p.latasTotales)}</td>
+      <td>${badgeCell(estadoAprobacionCelda(p.aprobadoIPS))}</td>
+      <td>${badgeCell(estadoAprobacionCelda(p.aprobadoEPS))}</td>
+      <td>${badgeCell(estadoEntregaCelda(p))}</td>
+    </tr>`).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:30px;">Sin resultados</td></tr>';
+  document.getElementById('tableFoot').textContent = `Mostrando ${Math.min(filtered.length,500)} de ${filtered.length} pacientes`;
+}
+
+/* ============================================================
+   Exportar versión pública (solo lectura, con los datos ya embebidos)
+   ============================================================ */
+function toSafeJson(obj){
+  // Escapamos '<' como \u003c: así ningún valor del Excel (aunque
+  // traiga etiquetas o el cierre de una etiqueta script) puede romper
+  // el HTML, y JSON.parse lo revierte automáticamente al leerlo de vuelta.
+  return JSON.stringify(obj).replace(/</g, '\\u003c');
+}
+
+document.getElementById('exportPublicBtn').addEventListener('click', function(){
+  if (!RAW.length){ alert('Primero carga un archivo Excel para poder generar la versión pública.'); return; }
+  const generatedAt = new Date().toLocaleString('es-CO');
+  let out = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+
+  // Importante: nunca escribimos la cadena literal de cierre de la
+  // etiqueta script dentro de nuestro propio código-fuente (ni siquiera
+  // en comentarios), porque cualquier navegador corta ahí la etiqueta,
+  // aunque esa cadena esté dentro de un string o de un comentario.
+  // Por eso solo reemplazamos hasta la apertura + el contenido por
+  // defecto, sin incluir el cierre en el texto buscado.
+  out = out.replace(
+    'id="embedded-data">[]',
+    'id="embedded-data">' + toSafeJson(RAW)
+  );
+  out = out.replace(
+    'id="embedded-meta">{}',
+    'id="embedded-meta">' + toSafeJson({generatedAt})
+  );
+
+  const blob = new Blob([out], {type:'text/html'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ketolance_publico.html';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
+/* ============================================================
+   Punto de entrada: si el archivo trae datos embebidos, es la
+   versión pública y se auto-carga sin necesitar subir el Excel.
+   ============================================================ */
+function readEmbedded(){
+  try{
+    const dataEl = document.getElementById('embedded-data');
+    const metaEl = document.getElementById('embedded-meta');
+    const raw = dataEl ? JSON.parse(dataEl.textContent || '[]') : [];
+    const meta = metaEl ? JSON.parse(metaEl.textContent || '{}') : {};
+    return {raw, meta};
+  }catch(err){
+    console.error('No se pudo leer los datos embebidos:', err);
+    return {raw:[], meta:{}};
+  }
+}
+
+(function initEmbedded(){
+  const {raw, meta} = readEmbedded();
+  if (Array.isArray(raw) && raw.length){
+    RAW = reviveData(raw);
+    document.body.classList.add('public-mode');
+    document.getElementById('modeChip').textContent = 'Vista pública · solo lectura';
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('dashboard').classList.add('visible');
+    document.getElementById('updatedText').innerHTML = 'Datos actualizados: <b>' + (meta.generatedAt || '') + '</b>';
+    buildFilterOptions();
+    render();
+  }
+})();
+</script>
+
+
+</body></html>
